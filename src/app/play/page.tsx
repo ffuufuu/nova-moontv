@@ -11101,8 +11101,8 @@ function PlayPageClient() {
 
               </div>
 
-              {/* 第三方应用打开按钮 - 观影室同步状态下隐藏 */}
-              {videoUrl && !playSync.isInRoom && (
+              {/* 第三方应用打开工具条已移除（自用精简） */}
+              {false && videoUrl && !playSync.isInRoom && (
                 <div className='mt-3 px-2 lg:flex-shrink-0'>
                   <div className='bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg p-2 border border-gray-200/50 dark:border-gray-700/50 w-full lg:w-auto overflow-x-auto'>
                     <div className='flex gap-1.5 flex-nowrap lg:flex-wrap items-center'>
