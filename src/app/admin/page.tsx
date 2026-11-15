@@ -421,6 +421,7 @@ interface SiteConfig {
   MagnetNyaaReverseProxy?: string;
   EnableComments: boolean;
   ShowPlayerToolbar?: boolean;
+  PlaybackDefaults?: Record<string, boolean | number | string>;
   EnableRegistration?: boolean;
   RequireRegistrationInviteCode?: boolean;
   RegistrationInviteCode?: string;

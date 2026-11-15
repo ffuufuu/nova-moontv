@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
-  Gauge,
   Globe,
   Home,
   LogOut,
@@ -288,7 +287,6 @@ export const UserMenu: React.FC = () => {
   );
   const [isUsageSectionOpen, setIsUsageSectionOpen] = useState(false);
   const [isDownloadSectionOpen, setIsDownloadSectionOpen] = useState(false);
-  const [isBufferSectionOpen, setIsBufferSectionOpen] = useState(false);
   const [isDanmakuSectionOpen, setIsDanmakuSectionOpen] = useState(false);
   const [isHomepageSectionOpen, setIsHomepageSectionOpen] = useState(false);
 
