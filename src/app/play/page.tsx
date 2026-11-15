@@ -8452,25 +8452,25 @@ function PlayPageClient() {
               html: '<i class="art-icon flex"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/></svg></i>',
               tooltip: '选集',
               click: function () {
-                // 自定义选集抽屉只服务全屏；竖屏用下方自带的选集标签
-                if (!document.fullscreenElement) return;
-                setFsEpisodeDrawerOpen(true);
-              },
-              mounted: function (el: any) {
-                // 仅全屏时显示：竖屏下方已有原生选集标签
-                const syncVisible = () => {
+                // 抽屉只服务全屏；竖屏平滑滚到下方原生选集面板
+                if (!document.fullscreenElement) {
                   try {
-                    const w = el && el.parentElement;
-                    if (!w) return;
-                    w.style.display = document.fullscreenElement ? '' : 'none';
+                    const holder = artRef.current;
+                    if (holder) {
+                      const rect = holder.getBoundingClientRect();
+                      window.scrollTo({
+                        top: window.scrollY + rect.bottom - 60,
+                        behavior: 'smooth',
+                      });
+                    }
                   } catch (e) {
                     /* ignore */
                   }
-                };
-                syncVisible();
-                document.addEventListener('fullscreenchange', syncVisible);
-                document.addEventListener('webkitfullscreenchange', syncVisible);
-
+                  return;
+                }
+                setFsEpisodeDrawerOpen(true);
+              },
+              mounted: function (el: any) {
                 // artplayer 会给自定义控件再套一层 .art-control 容器，
                 // 要移动的是那层 wrapper，不是 el 本身。
                 const relocate = (tries: number) => {
