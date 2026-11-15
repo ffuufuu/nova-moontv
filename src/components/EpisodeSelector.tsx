@@ -560,18 +560,8 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     setWatchedEpisodes(watched);
   }, [currentSource, currentId, episodeProgressContentKey, totalEpisodes, value]);
 
-  // 主要的 tab 状态：'danmaku' | 'episodes' | 'sources'
-  // 默认显示选集选项卡，但如果是房员则显示弹幕
-  const [activeTab, setActiveTab] = useState<'danmaku' | 'episodes' | 'sources'>(
-    isRoomMember ? 'danmaku' : 'episodes'
-  );
-
-  // 当房员状态变化时，自动切换到弹幕选项卡
-  useEffect(() => {
-    if (isRoomMember && (activeTab === 'episodes' || activeTab === 'sources')) {
-      setActiveTab('danmaku');
-    }
-  }, [isRoomMember, activeTab]);
+  // 主要的 tab 状态：'episodes' | 'sources'
+  const [activeTab, setActiveTab] = useState<'episodes' | 'sources'>('episodes');
 
   // 当前分组索引（0 开始）
   const initialPage = Math.max(
@@ -1083,33 +1073,6 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
           {isRoomMember && <span className="ml-1 text-xs">🔒</span>}
         </div>
 
-        {/* 弹幕选项卡 */}
-        <div
-          onClick={() => setActiveTab('danmaku')}
-          className={`flex-1 py-3 px-6 text-center cursor-pointer transition-all duration-200 font-medium
-            ${activeTab === 'danmaku'
-              ? 'text-green-600 dark:text-green-400'
-              : inactiveTabClass
-            }
-          `.trim()}
-        >
-          弹幕
-        </div>
-      </div>
-
-      {/* 弹幕 Tab 内容 */}
-      {activeTab === 'danmaku' && onDanmakuSelect && (
-        <div className='flex-1 min-h-0 overflow-hidden'>
-          <DanmakuPanel
-            videoTitle={videoTitle || ''}
-            currentEpisodeIndex={value - 1}
-            onDanmakuSelect={onDanmakuSelect}
-            currentSelection={currentDanmakuSelection || null}
-            onUploadDanmaku={onUploadDanmaku}
-            onEpisodesLoaded={onDanmakuEpisodesLoaded}
-          />
-        </div>
-      )}
 
       {/* 选集 Tab 内容 */}
       {activeTab === 'episodes' && (

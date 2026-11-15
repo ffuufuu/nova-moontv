@@ -8005,42 +8005,6 @@ function PlayPageClient() {
               },
             },
             {
-              html: '弹幕过滤',
-              icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="#ffffff"/><path d="M8 12h8" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/></svg>',
-              tooltip: '配置弹幕过滤规则',
-              onClick() {
-                // 如果播放器处于全屏状态，先退出全屏
-                if (artPlayerRef.current && artPlayerRef.current.fullscreen) {
-                  artPlayerRef.current.fullscreen = false;
-                  // 延迟一下再显示弹窗，确保全屏退出动画完成
-                  setTimeout(() => {
-                    setShowDanmakuFilterSettings(true);
-                  }, 300);
-                } else {
-                  setShowDanmakuFilterSettings(true);
-                }
-                return '打开设置';
-              },
-            },
-            // 热力图开关（仅在未禁用时显示）
-            ...(!danmakuHeatmapDisabledRef.current ? [{
-              name: '弹幕热力',
-              html: '弹幕热力',
-              icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" fill="#ffffff"/></svg>',
-              switch: danmakuHeatmapEnabledRef.current,
-              onSwitch: function (item: any) {
-                const newVal = !item.switch;
-                try {
-                  localStorage.setItem('danmaku_heatmap_enabled', String(newVal));
-                  setDanmakuHeatmapEnabled(newVal);
-                  console.log('弹幕热力已', newVal ? '开启' : '关闭');
-                } catch (err) {
-                  console.error('切换弹幕热力失败:', err);
-                }
-                return newVal;
-              },
-            }] : []),
-            {
               name: 'Anime4K超分',
               html: 'Anime4K超分',
               icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18c-4 0-7-3-7-7V9l7-3.5L19 9v4c0 4-3 7-7 7z" fill="#ffffff"/><path d="M10 12l2 2 4-4" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
