@@ -29,6 +29,8 @@ export interface AdminConfig {
     DoubanImageProxy: string;
     DisableYellowFilter: boolean;
     FluidSearch: boolean;
+    // 播放器下方工具条（下载/复制链接/App/PC/VLC/观影室/短剧/快捷键）开关
+    ShowPlayerToolbar?: boolean;
     // 弹幕配置
     DanmakuSourceType?: 'builtin' | 'custom';
     DanmakuApiBase: string;
