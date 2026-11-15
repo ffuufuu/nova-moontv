@@ -311,7 +311,7 @@ export default async function RootLayout({
     FLUID_SEARCH: fluidSearch,
     EnableComments: enableComments,
     SHOW_PLAYER_TOOLBAR: showPlayerToolbar,
-    PLAYBACK_DEFAULTS: config.SiteConfig.PlaybackDefaults || {},
+    PLAYBACK_DEFAULTS: (await getConfig()).SiteConfig.PlaybackDefaults || {},
     DANMAKU_AUTO_LOAD_DEFAULT: danmakuAutoLoadDefault,
     RecommendationDataSource: recommendationDataSource,
     TMDB_IMAGE_BASE_URL: tmdbImageBaseUrl,
