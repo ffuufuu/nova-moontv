@@ -25,15 +25,12 @@ import {
   AlertCircle,
   AlertTriangle,
   BarChart3,
-  BookMarked,
-  BookOpen,
   Bot,
   Cat,
   Check,
   CheckCircle,
   ChevronDown,
   ChevronUp,
-  Cloud,
   Copy,
   Database,
   ExternalLink,
@@ -47,7 +44,6 @@ import {
   Pencil,
   Plus,
   Search,
-  Send,
   Settings,
   Smartphone,
   Tablet,
@@ -61,7 +57,6 @@ import {
 } from 'lucide-react';
 import { GripVertical } from 'lucide-react';
 import {
-  Fragment,
   memo,
   Suspense,
   useCallback,
@@ -12353,7 +12348,7 @@ const SiteConfigComponent = ({
               ['DisableThumbnail', '禁用播放预览图', '不生成进度条悬停预览图，省流量', true],
               ['DisableDuanjuVertical', '禁用短剧竖屏模式', '短剧不再进入竖屏模式', false],
               ['DisableEpisodeTitleFetch', '禁用集数标题获取', '选集面板保持数字网格，不切换列表视图', false],
-            ] as [string, string, string, boolean][]
+            ] as unknown as [string, string, string, boolean][]
           ).map(([key, title, desc, def]) => {
             const val = (siteSettings.PlaybackDefaults?.[key] ?? def) === true;
             return (
