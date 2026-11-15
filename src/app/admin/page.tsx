@@ -13060,8 +13060,8 @@ const SiteConfigComponent = ({
           </div>
 
           {/* 播放器下方工具条开关 */}
-          <div className='flex items-center justify-between'>
-            <div>
+          <div className='flex items-center justify-between gap-3'>
+            <div className='flex-1 min-w-0'>
               <label className='block text-sm font-medium text-gray-700 dark:text-gray-300'>
                 显示播放器下方工具条
               </label>
@@ -13077,7 +13077,7 @@ const SiteConfigComponent = ({
                   ShowPlayerToolbar: !prev.ShowPlayerToolbar,
                 }))
               }
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
                 siteSettings.ShowPlayerToolbar
                   ? buttonStyles.toggleOn
                   : buttonStyles.toggleOff
