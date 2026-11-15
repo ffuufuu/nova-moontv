@@ -22,12 +22,6 @@ interface FullscreenEpisodeDrawerProps {
   onSourceChange?: (source: string, id: string, title: string) => void;
 }
 
-/**
- * 全屏(横屏)选集抽屉：
- * 全屏 API 下页面 DOM 被排除在 fullscreenElement 之外，
- * 所以这里用 createPortal 挂到 document.fullscreenElement 上，
- * 保证横屏全屏时也能看到选集面板。
- */
 export default function FullscreenEpisodeDrawer({
   open,
   onClose,
@@ -74,54 +68,48 @@ export default function FullscreenEpisodeDrawer({
         justifyContent: 'flex-end',
       }}
     >
-      <div
-        onClick={onClose}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0,0,0,0.45)',
-        }}
-      />
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0 }} />
       <div
         style={{
           position: 'relative',
-          width: 'min(48vw, 540px)',
-          minWidth: 300,
+          width: 'min(34vw, 460px)',
+          minWidth: 280,
           height: '100%',
-          background: 'rgba(18,18,18,0.97)',
-          borderLeft: '1px solid rgba(255,255,255,0.12)',
+          background: '#0b0b0d',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-12px 0 32px rgba(0,0,0,0.5)',
         }}
       >
         <div
           style={{
-            padding: '10px 14px',
+            padding: '0 16px',
+            height: 52,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
             flexShrink: 0,
           }}
         >
-          <div style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>
+          <div
+            style={{
+              color: '#fff',
+              fontSize: 17,
+              fontWeight: 600,
+              letterSpacing: 1,
+            }}
+          >
             选集
-            <span
-              style={{ color: '#9ca3af', fontWeight: 400, marginLeft: 8 }}
-            >
-              {currentEpisodeIndex + 1} / {totalEpisodes}
-            </span>
           </div>
           <button
             onClick={onClose}
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#9ca3af',
-              fontSize: 18,
+              color: 'rgba(255,255,255,0.45)',
+              fontSize: 20,
               cursor: 'pointer',
-              padding: '2px 8px',
+              padding: 0,
+              lineHeight: 1,
             }}
           >
             ×
@@ -129,29 +117,22 @@ export default function FullscreenEpisodeDrawer({
         </div>
 
         {sources.length > 1 && onSourceChange ? (
-          <div
-            style={{
-              padding: '8px 14px',
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-              flexShrink: 0,
-            }}
-          >
+          <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
             <select
               value={currentSource || ''}
               onChange={(e) => {
                 const item = sources.find((s) => s.source === e.target.value);
-                if (item) {
-                  onSourceChange(item.source, item.id, item.title);
-                }
+                if (item) onSourceChange(item.source, item.id, item.title);
               }}
               style={{
                 width: '100%',
-                background: '#242424',
-                color: '#e5e7eb',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 8,
-                padding: '6px 8px',
-                fontSize: 13,
+                background: '#16161a',
+                color: 'rgba(255,255,255,0.55)',
+                border: 'none',
+                borderRadius: 3,
+                padding: '7px 8px',
+                fontSize: 12,
+                outline: 'none',
               }}
             >
               {sources.map((s) => (
@@ -167,9 +148,9 @@ export default function FullscreenEpisodeDrawer({
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: 12,
+            padding: '0 16px 16px',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))',
+            gridTemplateColumns: 'repeat(4, 1fr)',
             gap: 8,
             alignContent: 'start',
           }}
@@ -186,18 +167,18 @@ export default function FullscreenEpisodeDrawer({
                 }}
                 title={title || '第' + (i + 1) + '集'}
                 style={{
-                  height: 38,
-                  borderRadius: 8,
-                  border: active
-                    ? '1px solid #22c55e'
-                    : '1px solid rgba(255,255,255,0.12)',
-                  background: active ? '#16a34a' : 'rgba(255,255,255,0.06)',
-                  color: active ? '#fff' : '#d1d5db',
-                  fontSize: 13,
+                  aspectRatio: '1 / 1',
+                  border: 'none',
+                  borderRadius: 2,
+                  background: active ? '#232327' : '#16161a',
+                  color: active ? '#22d3ee' : '#fff',
+                  fontSize: 15,
+                  fontWeight: active ? 600 : 400,
                   cursor: 'pointer',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
                 }}
               >
                 {i + 1}

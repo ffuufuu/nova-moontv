@@ -8471,33 +8471,41 @@ function PlayPageClient() {
           controls: [
             {
               position: 'right',
-              index: 90,
+              index: 5,
               html: '<i class="art-icon flex"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/></svg></i>',
               tooltip: '选集',
               click: function () {
                 setFsEpisodeDrawerOpen(true);
               },
               mounted: function (el: any) {
-                // 不依赖 index 排序：直接把自己挪到全屏按钮左侧
+                // artplayer 会给自定义控件再套一层 .art-control 容器，
+                // 要移动的是那层 wrapper，不是 el 本身。
                 const relocate = (tries: number) => {
                   try {
-                    const bar = el && el.parentElement;
+                    const wrapper = el && el.parentElement;
+                    const bar = wrapper && wrapper.parentElement;
                     if (!bar) return;
-                    const fsBtn = bar.querySelector(
+                    let fsBtn = bar.querySelector(
                       '.art-control-fullscreen'
-                    );
-                    if (fsBtn && fsBtn.parentElement === bar) {
-                      if (el.nextElementSibling !== fsBtn) {
-                        bar.insertBefore(el, fsBtn);
-                      }
+                    ) as HTMLElement | null;
+                    if (!fsBtn || fsBtn === wrapper) {
+                      const list = bar.querySelectorAll('[class*="fullscreen"]');
+                      fsBtn = list.length
+                        ? (list[list.length - 1] as HTMLElement)
+                        : null;
+                    }
+                    if (fsBtn && fsBtn !== wrapper) {
+                      bar.insertBefore(wrapper, fsBtn);
                       return;
                     }
-                    if (tries > 0) setTimeout(() => relocate(tries - 1), 150);
+                    if (tries > 0) {
+                      setTimeout(() => relocate(tries - 1), 200);
+                    }
                   } catch (e) {
                     /* ignore */
                   }
                 };
-                setTimeout(() => relocate(15), 60);
+                setTimeout(() => relocate(20), 60);
               },
             },
             {
