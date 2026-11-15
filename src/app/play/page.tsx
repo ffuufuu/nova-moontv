@@ -7943,7 +7943,7 @@ function PlayPageClient() {
               // 主题
               theme: 'dark',
               // 根据保存的显示状态设置初始可见性
-              visible: danmakuDisplayStateRef.current,
+              visible: false,
               filter: (danmu: any) => {
                 // 应用过滤规则
                 const filterConfig = danmakuFilterConfigRef.current;

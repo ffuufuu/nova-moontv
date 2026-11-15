@@ -1235,3 +1235,9 @@ html[data-loading-style='grid'] .mtv-err-box {
     transform: scale(0.85);
   }
 }
+
+/* Nova 精简：隐藏弹幕相关按钮与入口 */
+.art-controls [class*="danmuku"],
+.art-controls [class*="danmu"] {
+  display: none !important;
+}
