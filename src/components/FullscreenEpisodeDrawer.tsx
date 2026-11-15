@@ -22,6 +22,8 @@ interface FullscreenEpisodeDrawerProps {
   onSourceChange?: (source: string, id: string, title: string) => void;
 }
 
+const PAGE_SIZE = 50;
+
 export default function FullscreenEpisodeDrawer({
   open,
   onClose,
@@ -34,6 +36,7 @@ export default function FullscreenEpisodeDrawer({
   onSourceChange,
 }: FullscreenEpisodeDrawerProps) {
   const [portalHost, setPortalHost] = useState<Element | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
     const sync = () => {
@@ -48,10 +51,22 @@ export default function FullscreenEpisodeDrawer({
     };
   }, [open]);
 
-  const episodes = useMemo(
-    () => Array.from({ length: Math.max(0, totalEpisodes) }, (_, i) => i),
-    [totalEpisodes]
-  );
+  // 打开时自动跳到当前集所在分段
+  useEffect(() => {
+    if (!open) return;
+    setPageIndex(Math.floor(currentEpisodeIndex / PAGE_SIZE));
+  }, [open, currentEpisodeIndex]);
+
+  const pages = useMemo(() => {
+    const count = Math.ceil(Math.max(0, totalEpisodes) / PAGE_SIZE);
+    return Array.from({ length: count }, (_, i) => i);
+  }, [totalEpisodes]);
+
+  const visibleEpisodes = useMemo(() => {
+    const start = pageIndex * PAGE_SIZE;
+    const end = Math.min(start + PAGE_SIZE, totalEpisodes);
+    return Array.from({ length: Math.max(0, end - start) }, (_, i) => start + i);
+  }, [pageIndex, totalEpisodes]);
 
   if (!open) return null;
   if (typeof document === 'undefined') return null;
@@ -117,7 +132,7 @@ export default function FullscreenEpisodeDrawer({
         </div>
 
         {sources.length > 1 && onSourceChange ? (
-          <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
+          <div style={{ padding: '0 16px 6px', flexShrink: 0 }}>
             <select
               value={currentSource || ''}
               onChange={(e) => {
@@ -144,6 +159,43 @@ export default function FullscreenEpisodeDrawer({
           </div>
         ) : null}
 
+        {pages.length > 1 ? (
+          <div
+            style={{
+              padding: '4px 16px 10px',
+              display: 'flex',
+              gap: 8,
+              overflowX: 'auto',
+              flexShrink: 0,
+            }}
+          >
+            {pages.map((p) => {
+              const start = p * PAGE_SIZE + 1;
+              const end = Math.min((p + 1) * PAGE_SIZE, totalEpisodes);
+              const active = p === pageIndex;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPageIndex(p)}
+                  style={{
+                    flexShrink: 0,
+                    border: 'none',
+                    borderRadius: 4,
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    background: active ? '#22d3ee' : '#16161a',
+                    color: active ? '#04191c' : 'rgba(255,255,255,0.5)',
+                    fontWeight: active ? 600 : 400,
+                  }}
+                >
+                  {start}-{end}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         <div
           style={{
             flex: 1,
@@ -155,7 +207,7 @@ export default function FullscreenEpisodeDrawer({
             alignContent: 'start',
           }}
         >
-          {episodes.map((i) => {
+          {visibleEpisodes.map((i) => {
             const active = i === currentEpisodeIndex;
             const title = episodesTitles[i];
             return (
