@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       MagnetAcgripReverseProxy,
       MagnetNyaaReverseProxy,
       EnableComments,
+      ShowPlayerToolbar,
       CustomAdFilterCode,
       CustomAdFilterVersion,
       EnableRegistration,
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
       MagnetAcgripReverseProxy?: string;
       MagnetNyaaReverseProxy?: string;
       EnableComments: boolean;
+      ShowPlayerToolbar?: boolean;
       CustomAdFilterCode?: string;
       CustomAdFilterVersion?: number;
       EnableRegistration?: boolean;
@@ -317,6 +319,7 @@ export async function POST(request: NextRequest) {
       MagnetAcgripReverseProxy: normalizeApiBaseUrl(MagnetAcgripReverseProxy),
       MagnetNyaaReverseProxy: normalizeApiBaseUrl(MagnetNyaaReverseProxy),
       EnableComments,
+      ShowPlayerToolbar,
       CustomAdFilterCode,
       CustomAdFilterVersion,
       EnableRegistration,
