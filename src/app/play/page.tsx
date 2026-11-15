@@ -2418,6 +2418,19 @@ function PlayPageClient() {
     useState(false);
   const [fsEpisodeDrawerOpen, setFsEpisodeDrawerOpen] = useState(false);
 
+  // 退出全屏（含旋转回竖屏）时自动收起抽屉，避免竖屏残留半屏面板
+  useEffect(() => {
+    const closeOnExit = () => {
+      if (!document.fullscreenElement) setFsEpisodeDrawerOpen(false);
+    };
+    document.addEventListener('fullscreenchange', closeOnExit);
+    document.addEventListener('webkitfullscreenchange', closeOnExit);
+    return () => {
+      document.removeEventListener('fullscreenchange', closeOnExit);
+      document.removeEventListener('webkitfullscreenchange', closeOnExit);
+    };
+  }, []);
+
   // 下载选集面板显示状态
   const [showDownloadSelector, setShowDownloadSelector] = useState(false);
 
@@ -8444,6 +8457,20 @@ function PlayPageClient() {
                 setFsEpisodeDrawerOpen(true);
               },
               mounted: function (el: any) {
+                // 仅全屏时显示：竖屏下方已有原生选集标签
+                const syncVisible = () => {
+                  try {
+                    const w = el && el.parentElement;
+                    if (!w) return;
+                    w.style.display = document.fullscreenElement ? '' : 'none';
+                  } catch (e) {
+                    /* ignore */
+                  }
+                };
+                syncVisible();
+                document.addEventListener('fullscreenchange', syncVisible);
+                document.addEventListener('webkitfullscreenchange', syncVisible);
+
                 // artplayer 会给自定义控件再套一层 .art-control 容器，
                 // 要移动的是那层 wrapper，不是 el 本身。
                 const relocate = (tries: number) => {
