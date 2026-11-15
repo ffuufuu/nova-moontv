@@ -1073,6 +1073,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
           {isRoomMember && <span className="ml-1 text-xs">🔒</span>}
         </div>
 
+      </div>
 
       {/* 选集 Tab 内容 */}
       {activeTab === 'episodes' && (
