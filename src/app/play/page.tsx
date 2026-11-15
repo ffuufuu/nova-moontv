@@ -1437,7 +1437,7 @@ function PlayPageClient() {
             setShowDanmakuSourceSelector(true);
             setDanmakuLoading(false);
             if (artPlayerRef.current) {
-              artPlayerRef.current.notice.show = `找到 ${filteredAnimes.length} 个弹幕源，请选择`;
+              /* 弹幕功能已移除 */
             }
             return 'done';
           }
@@ -1481,19 +1481,19 @@ function PlayPageClient() {
           } else {
             console.warn('未找到剧集信息');
             if (artPlayerRef.current) {
-              artPlayerRef.current.notice.show = '弹幕加载失败：未找到剧集信息';
+              /* 弹幕功能已移除 */
             }
           }
         } else {
           console.warn('未找到匹配的弹幕');
           if (artPlayerRef.current) {
-            artPlayerRef.current.notice.show = '未找到匹配的弹幕，可在弹幕选项卡手动搜索';
+            /* 弹幕功能已移除 */
           }
         }
       } catch (error) {
         console.error('自动搜索弹幕失败:', error);
         if (artPlayerRef.current) {
-          artPlayerRef.current.notice.show = '弹幕加载失败，请检查网络或稍后重试';
+          /* 弹幕功能已移除 */
         }
       } finally {
         setDanmakuLoading(false);
@@ -6901,7 +6901,7 @@ function PlayPageClient() {
       } else {
         console.warn('[弹幕] 未找到匹配的弹幕');
         if (artPlayerRef.current) {
-          artPlayerRef.current.notice.show = '未找到匹配的弹幕源';
+          /* 弹幕功能已移除 */
         }
         setDanmakuLoading(false);
       }
