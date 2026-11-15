@@ -8477,6 +8477,28 @@ function PlayPageClient() {
               click: function () {
                 setFsEpisodeDrawerOpen(true);
               },
+              mounted: function (el: any) {
+                // 不依赖 index 排序：直接把自己挪到全屏按钮左侧
+                const relocate = (tries: number) => {
+                  try {
+                    const bar = el && el.parentElement;
+                    if (!bar) return;
+                    const fsBtn = bar.querySelector(
+                      '.art-control-fullscreen'
+                    );
+                    if (fsBtn && fsBtn.parentElement === bar) {
+                      if (el.nextElementSibling !== fsBtn) {
+                        bar.insertBefore(el, fsBtn);
+                      }
+                      return;
+                    }
+                    if (tries > 0) setTimeout(() => relocate(tries - 1), 150);
+                  } catch (e) {
+                    /* ignore */
+                  }
+                };
+                setTimeout(() => relocate(15), 60);
+              },
             },
             {
               position: 'left',
