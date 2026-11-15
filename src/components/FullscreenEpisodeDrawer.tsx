@@ -70,7 +70,8 @@ export default function FullscreenEpisodeDrawer({
 
   if (!open) return null;
   if (typeof document === 'undefined') return null;
-  const host = portalHost || document.body;
+  if (!portalHost) return null;
+  const host = portalHost;
   if (!host) return null;
 
   return createPortal(

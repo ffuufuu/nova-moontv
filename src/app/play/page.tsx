@@ -8439,6 +8439,8 @@ function PlayPageClient() {
               html: '<i class="art-icon flex"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/></svg></i>',
               tooltip: '选集',
               click: function () {
+                // 自定义选集抽屉只服务全屏；竖屏用下方自带的选集标签
+                if (!document.fullscreenElement) return;
                 setFsEpisodeDrawerOpen(true);
               },
               mounted: function (el: any) {
