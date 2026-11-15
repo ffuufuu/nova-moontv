@@ -31,6 +31,8 @@ export interface AdminConfig {
     FluidSearch: boolean;
     // 播放器下方工具条（下载/复制链接/App/PC/VLC/观影室/短剧/快捷键）开关
     ShowPlayerToolbar?: boolean;
+    // 播放与体验默认值（后台统一下发，客户端本地无值时采用）
+    PlaybackDefaults?: Record<string, boolean | number | string>;
     // 弹幕配置
     DanmakuSourceType?: 'builtin' | 'custom';
     DanmakuApiBase: string;

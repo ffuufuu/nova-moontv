@@ -311,6 +311,7 @@ export default async function RootLayout({
     FLUID_SEARCH: fluidSearch,
     EnableComments: enableComments,
     SHOW_PLAYER_TOOLBAR: showPlayerToolbar,
+    PLAYBACK_DEFAULTS: config.SiteConfig.PlaybackDefaults || {},
     DANMAKU_AUTO_LOAD_DEFAULT: danmakuAutoLoadDefault,
     RecommendationDataSource: recommendationDataSource,
     TMDB_IMAGE_BASE_URL: tmdbImageBaseUrl,
@@ -396,7 +397,33 @@ export default async function RootLayout({
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `window.RUNTIME_CONFIG = ${JSON.stringify(runtimeConfig)};`,
+            __html:
+              'window.RUNTIME_CONFIG = ' +
+              JSON.stringify(runtimeConfig) +
+              ';' +
+              '(function(){try{var d=window.RUNTIME_CONFIG.PLAYBACK_DEFAULTS||{};' +
+              'var m=' + JSON.stringify({
+                AggregateSearch: 'defaultAggregateSearch',
+                SaveLivePlayRecords: 'saveLivePlayRecords',
+                LiveAutoSpeedTest: 'liveAutoSpeedTest',
+                EnableOptimization: 'enableOptimization',
+                PreferStrategy: 'preferStrategy',
+                PreferMode: 'preferMode',
+                SpeedTestTimeout: 'speedTestTimeout',
+                FluidSearch: 'fluidSearch',
+                DisableBackdrop: 'tmdb_backdrop_disabled',
+                EnableTrailers: 'enableTrailers',
+                TraditionalToSimplified: 'searchTraditionalToSimplified',
+                ExactSearch: 'exactSearch',
+                BufferStrategy: 'bufferStrategy',
+                NextEpisodePreCache: 'nextEpisodePreCache',
+                DisableThumbnail: 'disablePlaybackThumbnail',
+                DisableDuanjuVertical: 'disableDuanjuVertical',
+                DisableEpisodeTitleFetch: 'disableEpisodeTitleFetch',
+              }) + ';' +
+              'for(var k in m){if(d[k]!==undefined&&d[k]!==null&&localStorage.getItem(m[k])===null){' +
+              'localStorage.setItem(m[k],JSON.stringify(d[k]))}}' +
+              '}catch(e){}})();',
           }}
         />
         {/* 流量统计脚本 */}

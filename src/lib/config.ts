@@ -354,6 +354,8 @@ async function getInitConfig(
       MagnetNyaaReverseProxy: '',
       // 播放器下方工具条开关（默认隐藏，后台可开）
       ShowPlayerToolbar: false,
+      // 播放与体验默认值（空对象 = 全部沿用硬编码默认）
+      PlaybackDefaults: {},
       // 评论功能开关
       EnableComments: false,
       EnableRegistration: false,

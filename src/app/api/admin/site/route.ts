@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       MagnetNyaaReverseProxy,
       EnableComments,
       ShowPlayerToolbar,
+      PlaybackDefaults,
       CustomAdFilterCode,
       CustomAdFilterVersion,
       EnableRegistration,
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
       MagnetNyaaReverseProxy?: string;
       EnableComments: boolean;
       ShowPlayerToolbar?: boolean;
+      PlaybackDefaults?: Record<string, boolean | number | string>;
       CustomAdFilterCode?: string;
       CustomAdFilterVersion?: number;
       EnableRegistration?: boolean;
@@ -320,6 +322,7 @@ export async function POST(request: NextRequest) {
       MagnetNyaaReverseProxy: normalizeApiBaseUrl(MagnetNyaaReverseProxy),
       EnableComments,
       ShowPlayerToolbar,
+      PlaybackDefaults,
       CustomAdFilterCode,
       CustomAdFilterVersion,
       EnableRegistration,

@@ -3940,7 +3940,7 @@ export const UserMenu: React.FC = () => {
                 <div className='flex items-center gap-2'>
                   <Sliders className='w-5 h-5 text-gray-600 dark:text-gray-400' />
                   <h3 className='text-base font-semibold text-gray-800 dark:text-gray-200'>
-                    通用设置
+                    播放与体验
                   </h3>
                 </div>
                 {isUsageSectionOpen ? (
@@ -4370,6 +4370,210 @@ export const UserMenu: React.FC = () => {
                   </div>
 
                 </div>
+                <div className='p-3 md:p-4 space-y-4 md:space-y-6'>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>
+                      调整播放器相关设置（仅在播放页面生效）
+                    </p>
+                  </div>
+
+                  {/* 缓冲策略 */}
+                  <div className='space-y-3'>
+                    <div>
+                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                        缓冲策略
+                      </h4>
+                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                        设置视频缓冲块大小，影响播放流畅度和流量消耗
+                      </p>
+                    </div>
+
+                    {/* 滑块控件 */}
+                    <div className='space-y-2'>
+                      <input
+                        type='range'
+                        min='0'
+                        max='3'
+                        step='1'
+                        value={getSliderValueFromStrategy(bufferStrategy)}
+                        onChange={(e) => {
+                          const sliderValue = parseInt(e.target.value);
+                          const strategy =
+                            getBufferStrategyFromSlider(sliderValue);
+                          handleBufferStrategyChange(strategy);
+                        }}
+                        className='w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500'
+                        style={{
+                          background: `linear-gradient(to right, rgb(34 197 94) 0%, rgb(34 197 94) ${
+                            (getSliderValueFromStrategy(bufferStrategy) / 3) *
+                            100
+                          }%, rgb(229 231 235) ${
+                            (getSliderValueFromStrategy(bufferStrategy) / 3) *
+                            100
+                          }%, rgb(229 231 235) 100%)`,
+                        }}
+                      />
+
+                      {/* 标签显示 */}
+                      <div className='flex justify-between text-xs text-gray-500 dark:text-gray-400 px-1'>
+                        <span
+                          className={
+                            bufferStrategy === 'low'
+                              ? 'font-semibold text-green-600 dark:text-green-400'
+                              : ''
+                          }
+                        >
+                          低缓冲
+                        </span>
+                        <span
+                          className={
+                            bufferStrategy === 'medium'
+                              ? 'font-semibold text-green-600 dark:text-green-400'
+                              : ''
+                          }
+                        >
+                          中缓冲
+                        </span>
+                        <span
+                          className={
+                            bufferStrategy === 'high'
+                              ? 'font-semibold text-green-600 dark:text-green-400'
+                              : ''
+                          }
+                        >
+                          高缓冲
+                        </span>
+                        <span
+                          className={
+                            bufferStrategy === 'ultra'
+                              ? 'font-semibold text-green-600 dark:text-green-400'
+                              : ''
+                          }
+                        >
+                          超高缓冲
+                        </span>
+                      </div>
+
+                      {/* 当前选择的说明 */}
+                      <div className='text-center text-sm font-medium text-gray-700 dark:text-gray-300 mt-2'>
+                        {
+                          bufferStrategyOptions.find(
+                            (option) => option.value === bufferStrategy
+                          )?.label
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 下集预缓冲 */}
+                  <div className='flex items-center justify-between'>
+                    <div>
+                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                        下集预缓冲
+                      </h4>
+                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                        播放进度达到90%时，自动预缓冲下一集内容
+                      </p>
+                    </div>
+                    <label className='flex items-center cursor-pointer'>
+                      <div className='relative'>
+                        <input
+                          type='checkbox'
+                          className='sr-only peer'
+                          checked={nextEpisodePreCache}
+                          onChange={(e) =>
+                            handleNextEpisodePreCacheToggle(e.target.checked)
+                          }
+                        />
+                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
+                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* 禁用播放预览图 */}
+                  <div className='flex items-center justify-between'>
+                    <div>
+                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                        禁用播放预览图
+                      </h4>
+                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                        关闭后不再生成进度条悬停预览图。生成预览图需完整抽帧整个视频，流量开销较大，修改后重新进入播放页生效
+                      </p>
+                    </div>
+                    <label className='flex items-center cursor-pointer'>
+                      <div className='relative'>
+                        <input
+                          type='checkbox'
+                          className='sr-only peer'
+                          checked={disablePlaybackThumbnail}
+                          onChange={(e) =>
+                            handleDisablePlaybackThumbnailToggle(
+                              e.target.checked
+                            )
+                          }
+                        />
+                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
+                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* 禁用短剧竖屏模式 */}
+                  <div className='flex items-center justify-between'>
+                    <div>
+                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                        禁用短剧竖屏模式
+                      </h4>
+                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                        禁用后短剧不再进入竖屏模式
+                      </p>
+                    </div>
+                    <label className='flex items-center cursor-pointer'>
+                      <div className='relative'>
+                        <input
+                          type='checkbox'
+                          className='sr-only peer'
+                          checked={disableDuanjuVertical}
+                          onChange={(e) =>
+                            handleDisableDuanjuVerticalToggle(e.target.checked)
+                          }
+                        />
+                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
+                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* 禁用集数标题获取并切换 */}
+                  <div className='flex items-center justify-between'>
+                    <div>
+                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                        禁用集数标题获取并切换
+                      </h4>
+                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                        开启后不再获取分集标题，选集面板保持数字网格视图，不自动切换为列表视图
+                      </p>
+                    </div>
+                    <label className='flex items-center cursor-pointer'>
+                      <div className='relative'>
+                        <input
+                          type='checkbox'
+                          className='sr-only peer'
+                          checked={disableEpisodeTitleFetch}
+                          onChange={(e) =>
+                            handleDisableEpisodeTitleFetchToggle(
+                              e.target.checked
+                            )
+                          }
+                        />
+                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
+                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
               )}
             </div>
 
@@ -4685,505 +4889,6 @@ export const UserMenu: React.FC = () => {
                       <Package className='w-4 h-4' />
                       下载文件管理
                     </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 播放设置 */}
-            <div className='border border-gray-200 dark:border-gray-700 rounded-lg overflow-visible'>
-              <button
-                onClick={() => setIsBufferSectionOpen(!isBufferSectionOpen)}
-                className='w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors flex items-center justify-between'
-              >
-                <div className='flex items-center gap-2'>
-                  <Gauge className='w-5 h-5 text-gray-600 dark:text-gray-400' />
-                  <h3 className='text-base font-semibold text-gray-800 dark:text-gray-200'>
-                    播放设置
-                  </h3>
-                </div>
-                {isBufferSectionOpen ? (
-                  <ChevronUp className='w-5 h-5 text-gray-600 dark:text-gray-400' />
-                ) : (
-                  <ChevronDown className='w-5 h-5 text-gray-600 dark:text-gray-400' />
-                )}
-              </button>
-              {isBufferSectionOpen && (
-                <div className='p-3 md:p-4 space-y-4 md:space-y-6'>
-                  <div>
-                    <p className='text-xs text-gray-500 dark:text-gray-400'>
-                      调整播放器相关设置（仅在播放页面生效）
-                    </p>
-                  </div>
-
-                  {/* 缓冲策略 */}
-                  <div className='space-y-3'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        缓冲策略
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        设置视频缓冲块大小，影响播放流畅度和流量消耗
-                      </p>
-                    </div>
-
-                    {/* 滑块控件 */}
-                    <div className='space-y-2'>
-                      <input
-                        type='range'
-                        min='0'
-                        max='3'
-                        step='1'
-                        value={getSliderValueFromStrategy(bufferStrategy)}
-                        onChange={(e) => {
-                          const sliderValue = parseInt(e.target.value);
-                          const strategy =
-                            getBufferStrategyFromSlider(sliderValue);
-                          handleBufferStrategyChange(strategy);
-                        }}
-                        className='w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500'
-                        style={{
-                          background: `linear-gradient(to right, rgb(34 197 94) 0%, rgb(34 197 94) ${
-                            (getSliderValueFromStrategy(bufferStrategy) / 3) *
-                            100
-                          }%, rgb(229 231 235) ${
-                            (getSliderValueFromStrategy(bufferStrategy) / 3) *
-                            100
-                          }%, rgb(229 231 235) 100%)`,
-                        }}
-                      />
-
-                      {/* 标签显示 */}
-                      <div className='flex justify-between text-xs text-gray-500 dark:text-gray-400 px-1'>
-                        <span
-                          className={
-                            bufferStrategy === 'low'
-                              ? 'font-semibold text-green-600 dark:text-green-400'
-                              : ''
-                          }
-                        >
-                          低缓冲
-                        </span>
-                        <span
-                          className={
-                            bufferStrategy === 'medium'
-                              ? 'font-semibold text-green-600 dark:text-green-400'
-                              : ''
-                          }
-                        >
-                          中缓冲
-                        </span>
-                        <span
-                          className={
-                            bufferStrategy === 'high'
-                              ? 'font-semibold text-green-600 dark:text-green-400'
-                              : ''
-                          }
-                        >
-                          高缓冲
-                        </span>
-                        <span
-                          className={
-                            bufferStrategy === 'ultra'
-                              ? 'font-semibold text-green-600 dark:text-green-400'
-                              : ''
-                          }
-                        >
-                          超高缓冲
-                        </span>
-                      </div>
-
-                      {/* 当前选择的说明 */}
-                      <div className='text-center text-sm font-medium text-gray-700 dark:text-gray-300 mt-2'>
-                        {
-                          bufferStrategyOptions.find(
-                            (option) => option.value === bufferStrategy
-                          )?.label
-                        }
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 下集预缓冲 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        下集预缓冲
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        播放进度达到90%时，自动预缓冲下一集内容
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={nextEpisodePreCache}
-                          onChange={(e) =>
-                            handleNextEpisodePreCacheToggle(e.target.checked)
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* 禁用播放预览图 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        禁用播放预览图
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        关闭后不再生成进度条悬停预览图。生成预览图需完整抽帧整个视频，流量开销较大，修改后重新进入播放页生效
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={disablePlaybackThumbnail}
-                          onChange={(e) =>
-                            handleDisablePlaybackThumbnailToggle(
-                              e.target.checked
-                            )
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* 禁用短剧竖屏模式 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        禁用短剧竖屏模式
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        禁用后短剧不再进入竖屏模式
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={disableDuanjuVertical}
-                          onChange={(e) =>
-                            handleDisableDuanjuVerticalToggle(e.target.checked)
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* 禁用集数标题获取并切换 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        禁用集数标题获取并切换
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        开启后不再获取分集标题，选集面板保持数字网格视图，不自动切换为列表视图
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={disableEpisodeTitleFetch}
-                          onChange={(e) =>
-                            handleDisableEpisodeTitleFetchToggle(
-                              e.target.checked
-                            )
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 弹幕设置 */}
-            <div className='border border-gray-200 dark:border-gray-700 rounded-lg overflow-visible'>
-              <button
-                onClick={() => setIsDanmakuSectionOpen(!isDanmakuSectionOpen)}
-                className='w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors flex items-center justify-between'
-              >
-                <div className='flex items-center gap-2'>
-                  <MessageSquare className='w-5 h-5 text-gray-600 dark:text-gray-400' />
-                  <h3 className='text-base font-semibold text-gray-800 dark:text-gray-200'>
-                    弹幕设置
-                  </h3>
-                </div>
-                {isDanmakuSectionOpen ? (
-                  <ChevronUp className='w-5 h-5 text-gray-600 dark:text-gray-400' />
-                ) : (
-                  <ChevronDown className='w-5 h-5 text-gray-600 dark:text-gray-400' />
-                )}
-              </button>
-              {isDanmakuSectionOpen && (
-                <div className='p-3 md:p-4 space-y-4 md:space-y-6'>
-                  {/* 禁用自动装填弹幕 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        禁用自动装填弹幕
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        开启后，播放页面不会自动匹配弹幕，只能手动匹配
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={disableAutoLoadDanmaku}
-                          onChange={(e) =>
-                            handleDisableAutoLoadDanmakuToggle(e.target.checked)
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* 下集弹幕预加载 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        下集弹幕预加载
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        播放进度达到90%时，自动预加载下一集弹幕
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={nextEpisodeDanmakuPreload}
-                          onChange={(e) =>
-                            handleNextEpisodeDanmakuPreloadToggle(
-                              e.target.checked
-                            )
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* 禁用弹幕热力图 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        禁用弹幕热力图
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        开启后不显示弹幕热力图和热力图开关
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={danmakuHeatmapDisabled}
-                          onChange={(e) =>
-                            handleDanmakuHeatmapDisabledToggle(e.target.checked)
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* 弹幕繁简转换 */}
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        弹幕繁简转换
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        开启后，拉取弹幕时自动将繁体中文转换为简体中文
-                      </p>
-                    </div>
-                    <label className='flex items-center cursor-pointer'>
-                      <div className='relative'>
-                        <input
-                          type='checkbox'
-                          className='sr-only peer'
-                          checked={danmakuTraditionalToSimplified}
-                          onChange={(e) =>
-                            handleDanmakuTraditionalToSimplifiedToggle(
-                              e.target.checked
-                            )
-                          }
-                        />
-                        <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
-                        <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* 弹幕加载上限 */}
-                  <div className='space-y-2'>
-                    <div className='flex items-center justify-between'>
-                      <span className='text-xs text-gray-600 dark:text-gray-400'>
-                        弹幕加载上限
-                      </span>
-                      <span className='text-xs font-medium text-gray-700 dark:text-gray-300'>
-                        {danmakuMaxCount === 0
-                          ? '无上限'
-                          : `${danmakuMaxCount} 条`}
-                      </span>
-                    </div>
-                    <div className='flex items-center gap-2'>
-                      <input
-                        type='range'
-                        min='0'
-                        max='10000'
-                        step='100'
-                        value={danmakuMaxCount}
-                        onChange={(e) =>
-                          handleDanmakuMaxCountChange(parseInt(e.target.value))
-                        }
-                        className='flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700'
-                        style={{
-                          background: `linear-gradient(to right, #10b981 0%, #10b981 ${
-                            (danmakuMaxCount / 10000) * 100
-                          }%, #e5e7eb ${
-                            (danmakuMaxCount / 10000) * 100
-                          }%, #e5e7eb 100%)`,
-                        }}
-                      />
-                    </div>
-                    <div
-                      className='relative text-xs text-gray-500 dark:text-gray-400'
-                      style={{ height: '24px' }}
-                    >
-                      <button
-                        onClick={() => handleDanmakuMaxCountChange(0)}
-                        className={`absolute px-2 py-0.5 rounded ${
-                          danmakuMaxCount === 0
-                            ? 'bg-green-500 text-white'
-                            : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                        style={{ left: '0%', transform: 'translateX(0%)' }}
-                      >
-                        无上限
-                      </button>
-                      <button
-                        onClick={() => handleDanmakuMaxCountChange(3000)}
-                        className={`absolute px-2 py-0.5 rounded ${
-                          danmakuMaxCount === 3000
-                            ? 'bg-green-500 text-white'
-                            : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                        style={{ left: '30%', transform: 'translateX(-50%)' }}
-                      >
-                        3000
-                      </button>
-                      <button
-                        onClick={() => handleDanmakuMaxCountChange(5000)}
-                        className={`absolute px-2 py-0.5 rounded ${
-                          danmakuMaxCount === 5000
-                            ? 'bg-green-500 text-white'
-                            : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                        style={{ left: '50%', transform: 'translateX(-50%)' }}
-                      >
-                        5000
-                      </button>
-                      <button
-                        onClick={() => handleDanmakuMaxCountChange(10000)}
-                        className={`absolute px-2 py-0.5 rounded ${
-                          danmakuMaxCount === 10000
-                            ? 'bg-green-500 text-white'
-                            : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                        style={{ left: '100%', transform: 'translateX(-100%)' }}
-                      >
-                        10000
-                      </button>
-                    </div>
-                    <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                      限制加载的弹幕数量，减少性能消耗
-                    </p>
-                  </div>
-
-                  {/* 清除弹幕缓存 */}
-                  <div className='space-y-3'>
-                    <div>
-                      <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                        弹幕缓存管理
-                      </h4>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        弹幕缓存空间占用：{danmakuCacheUsage}
-                      </p>
-                      <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        清除所有已缓存的弹幕数据
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleClearDanmakuCache}
-                      disabled={isClearingCache}
-                      className='w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:bg-red-400 dark:bg-red-600 dark:hover:bg-red-700 dark:disabled:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md disabled:cursor-not-allowed flex items-center justify-center gap-2'
-                    >
-                      {isClearingCache ? (
-                        <>
-                          <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
-                          <span>清除中...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className='w-4 h-4'
-                            fill='none'
-                            stroke='currentColor'
-                            viewBox='0 0 24 24'
-                          >
-                            <path
-                              strokeLinecap='round'
-                              strokeLinejoin='round'
-                              strokeWidth={2}
-                              d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
-                            />
-                          </svg>
-                          <span>清除弹幕缓存</span>
-                        </>
-                      )}
-                    </button>
-
-                    {/* 成功/失败提示 */}
-                    {clearCacheMessage && (
-                      <div
-                        className={`text-sm p-3 rounded-lg border ${
-                          clearCacheMessage.includes('成功')
-                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
-                            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
-                        }`}
-                      >
-                        {clearCacheMessage}
-                      </div>
-                    )}
                   </div>
                 </div>
               )}

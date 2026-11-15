@@ -12327,6 +12327,164 @@ const SiteConfigComponent = ({
         </p>
       </div>
 
+      {/* 播放与体验默认值 */}
+      <details className='pt-4 border-t border-gray-200 dark:border-gray-700'>
+        <summary className='text-sm font-semibold text-gray-900 dark:text-gray-100 cursor-pointer'>
+          播放与体验默认值
+        </summary>
+        <div className='mt-4 space-y-4'>
+          <p className='text-xs text-gray-500 dark:text-gray-400'>
+            客户端本地没有对应设置时，自动采用这里的值。已在本机改过的项不受影响。
+          </p>
+
+          {(
+            [
+              ['AggregateSearch', '默认聚合搜索结果', '搜索时默认按标题和年份聚合显示结果', true],
+              ['EnableOptimization', '优选和测速', '如出现播放器劫持问题可关闭', true],
+              ['LiveAutoSpeedTest', '电视直播自动测速', '开启后自动测速当前分组下的线路', false],
+              ['FluidSearch', '流式搜索输出', '搜索结果显示实时流式输出', true],
+              ['DisableBackdrop', '禁用背景图渲染', '关闭播放页的 TMDB 背景图渲染', false],
+              ['EnableTrailers', '首页预告片', '首页轮播图显示视频预告片', false],
+              ['TraditionalToSimplified', '搜索繁体转简体', '搜索时自动把繁体转为简体', false],
+              ['ExactSearch', '精确搜索', '过滤掉不包含搜索词的结果', true],
+              ['SaveLivePlayRecords', '保存直播播放记录', '保存直播频道观看记录', false],
+              ['NextEpisodePreCache', '下集预缓冲', '播放进度到 90% 时预缓冲下一集', true],
+              ['DisableThumbnail', '禁用播放预览图', '不生成进度条悬停预览图，省流量', true],
+              ['DisableDuanjuVertical', '禁用短剧竖屏模式', '短剧不再进入竖屏模式', false],
+              ['DisableEpisodeTitleFetch', '禁用集数标题获取', '选集面板保持数字网格，不切换列表视图', false],
+            ] as [string, string, string, boolean][]
+          ).map(([key, title, desc, def]) => {
+            const val = (siteSettings.PlaybackDefaults?.[key] ?? def) === true;
+            return (
+              <div key={key} className='flex items-center justify-between gap-3'>
+                <div className='flex-1 min-w-0'>
+                  <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                    {title}
+                  </h4>
+                  <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+                    {desc}
+                  </p>
+                </div>
+                <button
+                  type='button'
+                  onClick={() =>
+                    setSiteSettings((prev) => ({
+                      ...prev,
+                      PlaybackDefaults: {
+                        ...(prev.PlaybackDefaults || {}),
+                        [key]: !val,
+                      },
+                    }))
+                  }
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                    val ? buttonStyles.toggleOn : buttonStyles.toggleOff
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full ${buttonStyles.toggleThumb} transition-transform ${
+                      val ? buttonStyles.toggleThumbOn : buttonStyles.toggleThumbOff
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })}
+
+          <div>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+              优选策略
+            </label>
+            <select
+              value={String(siteSettings.PlaybackDefaults?.PreferStrategy ?? 'fast')}
+              onChange={(e) =>
+                setSiteSettings((prev) => ({
+                  ...prev,
+                  PlaybackDefaults: {
+                    ...(prev.PlaybackDefaults || {}),
+                    PreferStrategy: e.target.value,
+                  },
+                }))
+              }
+              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent'
+            >
+              <option value='fast'>快速优选</option>
+              <option value='full'>全量优选</option>
+            </select>
+          </div>
+
+          <div>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+              优选偏好
+            </label>
+            <select
+              value={String(siteSettings.PlaybackDefaults?.PreferMode ?? 'balanced')}
+              onChange={(e) =>
+                setSiteSettings((prev) => ({
+                  ...prev,
+                  PlaybackDefaults: {
+                    ...(prev.PlaybackDefaults || {}),
+                    PreferMode: e.target.value,
+                  },
+                }))
+              }
+              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent'
+            >
+              <option value='balanced'>综合判定</option>
+              <option value='resolution'>分辨率优先</option>
+              <option value='speed'>网速优先</option>
+            </select>
+          </div>
+
+          <div>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+              换源面板测速超时
+            </label>
+            <select
+              value={String(siteSettings.PlaybackDefaults?.SpeedTestTimeout ?? 4)}
+              onChange={(e) =>
+                setSiteSettings((prev) => ({
+                  ...prev,
+                  PlaybackDefaults: {
+                    ...(prev.PlaybackDefaults || {}),
+                    SpeedTestTimeout: Number(e.target.value),
+                  },
+                }))
+              }
+              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent'
+            >
+              <option value='4'>4 秒</option>
+              <option value='10'>10 秒</option>
+              <option value='20'>20 秒</option>
+              <option value='30'>30 秒</option>
+            </select>
+          </div>
+
+          <div>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+              缓冲策略
+            </label>
+            <select
+              value={String(siteSettings.PlaybackDefaults?.BufferStrategy ?? 'ultra')}
+              onChange={(e) =>
+                setSiteSettings((prev) => ({
+                  ...prev,
+                  PlaybackDefaults: {
+                    ...(prev.PlaybackDefaults || {}),
+                    BufferStrategy: e.target.value,
+                  },
+                }))
+              }
+              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent'
+            >
+              <option value='low'>低缓冲</option>
+              <option value='medium'>中缓冲</option>
+              <option value='high'>高缓冲</option>
+              <option value='ultra'>超高缓冲（极速体验）</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
       <details className='pt-4 border-t border-gray-200 dark:border-gray-700'>
         <summary className='text-sm font-semibold text-gray-900 dark:text-gray-100 cursor-pointer'>
           数据源配置
