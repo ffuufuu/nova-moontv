@@ -19591,46 +19591,6 @@ function AdminPageClient() {
       render: () => <VideoSourceScriptLab />,
     },
     {
-      key: 'musicConfig',
-      title: '音乐配置',
-      icon: (
-        <svg
-          width='20'
-          height='20'
-          viewBox='0 0 24 24'
-          fill='none'
-          stroke='currentColor'
-          strokeWidth='2'
-          strokeLinecap='round'
-          strokeLinejoin='round'
-          className={navIconClass}
-        >
-          <path d='M9 18V5l12-2v13' />
-          <circle cx='6' cy='18' r='3' />
-          <circle cx='18' cy='16' r='3' />
-        </svg>
-      ),
-      render: () => (
-        <MusicConfigComponent config={config} refreshConfig={fetchConfig} />
-      ),
-    },
-    {
-      key: 'suwayomiConfig',
-      title: '漫画配置',
-      icon: <BookOpen size={20} className={navIconClass} />,
-      render: () => (
-        <SuwayomiConfigComponent config={config} refreshConfig={fetchConfig} />
-      ),
-    },
-    {
-      key: 'opdsConfig',
-      title: '电子书配置',
-      icon: <BookMarked size={20} className={navIconClass} />,
-      render: () => (
-        <OPDSConfigComponent config={config} refreshConfig={fetchConfig} />
-      ),
-    },
-    {
       key: 'liveSource',
       title: '电视直播源配置',
       icon: <Tv size={20} className={navIconClass} />,
@@ -19647,83 +19607,25 @@ function AdminPageClient() {
       ),
     },
     {
-      key: 'mediaLibrary',
-      title: '私人影库',
-      icon: (
-        <Database size={20} className='text-yellow-700 dark:text-yellow-400' />
+      key: 'movieRequests',
+      title: '求片管理',
+      icon: <Video size={20} className={navIconClass} />,
+      render: () => (
+        <MovieRequestsComponent
+          config={config}
+          refreshConfig={fetchConfig}
+        />
       ),
-      children: [
-        {
-          key: 'openListConfig',
-          title: 'Openlist配置',
-          icon: <FolderOpen size={20} className={navIconClass} />,
-          render: () => (
-            <OpenListConfigComponent
-              config={config}
-              refreshConfig={fetchConfig}
-            />
-          ),
-        },
-        {
-          key: 'embyConfig',
-          title: 'Emby 媒体库',
-          icon: <FolderOpen size={20} className={navIconClass} />,
-          render: () => (
-            <EmbyConfigComponent config={config} refreshConfig={fetchConfig} />
-          ),
-        },
-        {
-          key: 'xiaoyaConfig',
-          title: '小雅配置',
-          icon: <FolderOpen size={20} className={navIconClass} />,
-          render: () => (
-            <XiaoyaConfigComponent
-              config={config}
-              refreshConfig={fetchConfig}
-            />
-          ),
-        },
-        {
-          key: 'movieRequests',
-          title: '求片管理',
-          icon: <Video size={20} className={navIconClass} />,
-          render: () => (
-            <MovieRequestsComponent
-              config={config}
-              refreshConfig={fetchConfig}
-            />
-          ),
-        },
-        {
-          key: 'animeSubscription',
-          title: '追番订阅',
-          icon: <Cat size={20} className={navIconClass} />,
-          render: () => (
-            <AnimeSubscriptionComponent
-              config={config}
-              refreshConfig={fetchConfig}
-            />
-          ),
-        },
-        {
-          key: 'netDiskConfig',
-          title: '网盘配置',
-          icon: <Cloud size={20} className={navIconClass} />,
-          render: () => (
-            <NetDiskConfigComponent
-              config={config}
-              refreshConfig={fetchConfig}
-            />
-          ),
-        },
-      ],
     },
     {
-      key: 'aiConfig',
-      title: 'AI设定',
-      icon: <Bot size={20} className={navIconClass} />,
+      key: 'animeSubscription',
+      title: '追番订阅',
+      icon: <Cat size={20} className={navIconClass} />,
       render: () => (
-        <AIConfigComponent config={config} refreshConfig={fetchConfig} />
+        <AnimeSubscriptionComponent
+          config={config}
+          refreshConfig={fetchConfig}
+        />
       ),
     },
     {
@@ -19732,14 +19634,6 @@ function AdminPageClient() {
       icon: <Mail size={20} className={navIconClass} />,
       render: () => (
         <EmailConfigComponent config={config} refreshConfig={fetchConfig} />
-      ),
-    },
-    {
-      key: 'telegramConfig',
-      title: 'Telegram Bot',
-      icon: <Send size={20} className={navIconClass} />,
-      render: () => (
-        <TelegramConfigComponent config={config} refreshConfig={fetchConfig} />
       ),
     },
     {
