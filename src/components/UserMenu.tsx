@@ -4364,8 +4364,6 @@ export const UserMenu: React.FC = () => {
                     </label>
                   </div>
 
-                </div>
-                <div className='p-3 md:p-4 space-y-4 md:space-y-6'>
                   <div>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>
                       调整播放器相关设置（仅在播放页面生效）
