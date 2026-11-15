@@ -107,6 +107,7 @@ import {
 } from '@/lib/hls-ad-filter.client';
 import { useEnableAIComments } from '@/hooks/useEnableAIComments';
 import { useEnableComments } from '@/hooks/useEnableComments';
+import { useShowPlayerToolbar } from '@/hooks/useShowPlayerToolbar';
 import { useWatchRoomContextSafe } from '@/components/WatchRoomProvider';
 import {
   getRoomRemotePlaybackRate,
@@ -287,6 +288,7 @@ function PlayPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const enableComments = useEnableComments();
+  const showPlayerToolbar = useShowPlayerToolbar();
   const enableAIComments = useEnableAIComments();
   const { addDownloadTask } = useDownload();
   const { siteName } = useSite();
@@ -11103,7 +11105,7 @@ function PlayPageClient() {
 
               {/* 第三方应用打开工具条已隐藏（自用精简） */}
               {videoUrl && !playSync.isInRoom && (
-                <div className='hidden mt-3 px-2 lg:flex-shrink-0'>
+                <div className={`${showPlayerToolbar ? '' : 'hidden'} mt-3 px-2 lg:flex-shrink-0`}>
                   <div className='bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg p-2 border border-gray-200/50 dark:border-gray-700/50 w-full lg:w-auto overflow-x-auto'>
                     <div className='flex gap-1.5 flex-nowrap lg:flex-wrap items-center'>
                       <div className='flex gap-1.5 flex-nowrap lg:flex-wrap lg:justify-end lg:flex-1'>

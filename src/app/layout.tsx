@@ -122,6 +122,7 @@ export default async function RootLayout({
   let aiEnableVideoCardEntry = false;
   let aiEnablePlayPageEntry = false;
   let aiEnableComments = false;
+  let showPlayerToolbar = true;
   let aiDefaultMessageNoVideo = '';
   let aiDefaultMessageWithVideo = '';
   let enableMovieRequest = true;
@@ -179,6 +180,7 @@ export default async function RootLayout({
     }));
     fluidSearch = config.SiteConfig.FluidSearch;
     enableComments = config.SiteConfig.EnableComments;
+    showPlayerToolbar = config.SiteConfig.ShowPlayerToolbar !== false;
     danmakuAutoLoadDefault = config.SiteConfig.DanmakuAutoLoadDefault !== false;
     recommendationDataSource =
       config.SiteConfig.RecommendationDataSource || 'Mixed';
@@ -308,6 +310,7 @@ export default async function RootLayout({
     CUSTOM_CATEGORIES: customCategories,
     FLUID_SEARCH: fluidSearch,
     EnableComments: enableComments,
+    SHOW_PLAYER_TOOLBAR: showPlayerToolbar,
     DANMAKU_AUTO_LOAD_DEFAULT: danmakuAutoLoadDefault,
     RecommendationDataSource: recommendationDataSource,
     TMDB_IMAGE_BASE_URL: tmdbImageBaseUrl,

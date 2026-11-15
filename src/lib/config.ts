@@ -352,6 +352,8 @@ async function getInitConfig(
       MagnetDmhyReverseProxy: '',
       MagnetAcgripReverseProxy: '',
       MagnetNyaaReverseProxy: '',
+      // 播放器下方工具条开关（默认隐藏，后台可开）
+      ShowPlayerToolbar: false,
       // 评论功能开关
       EnableComments: false,
       EnableRegistration: false,

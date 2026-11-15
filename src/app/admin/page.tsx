@@ -420,6 +420,7 @@ interface SiteConfig {
   MagnetAcgripReverseProxy?: string;
   MagnetNyaaReverseProxy?: string;
   EnableComments: boolean;
+  ShowPlayerToolbar?: boolean;
   EnableRegistration?: boolean;
   RequireRegistrationInviteCode?: boolean;
   RegistrationInviteCode?: string;
@@ -11629,6 +11630,7 @@ const SiteConfigComponent = ({
     MagnetAcgripReverseProxy: '',
     MagnetNyaaReverseProxy: '',
     EnableComments: false,
+    ShowPlayerToolbar: false,
     EnableRegistration: false,
     RegistrationRequireTurnstile: false,
     LoginRequireTurnstile: false,
@@ -11760,6 +11762,7 @@ const SiteConfigComponent = ({
           config.SiteConfig.MagnetAcgripReverseProxy || '',
         MagnetNyaaReverseProxy: config.SiteConfig.MagnetNyaaReverseProxy || '',
         EnableComments: config.SiteConfig.EnableComments || false,
+        ShowPlayerToolbar: config.SiteConfig.ShowPlayerToolbar !== false,
         AnnouncementDisplayMode:
           config.SiteConfig.AnnouncementDisplayMode === 'every'
             ? 'every'
@@ -13054,6 +13057,42 @@ const SiteConfigComponent = ({
             <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
               开启后将显示豆瓣评论与相似推荐。评论为逆向抓取，请自行承担责任。
             </p>
+          </div>
+
+          {/* 播放器下方工具条开关 */}
+          <div className='flex items-center justify-between'>
+            <div>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300'>
+                显示播放器下方工具条
+              </label>
+              <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+                关闭后隐藏下载、复制链接、App/PC/VLC 打开、观影室、短剧竖屏、快捷键说明等按钮，播放与选集不受影响。
+              </p>
+            </div>
+            <button
+              type='button'
+              onClick={() =>
+                setSiteSettings((prev) => ({
+                  ...prev,
+                  ShowPlayerToolbar: !prev.ShowPlayerToolbar,
+                }))
+              }
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                siteSettings.ShowPlayerToolbar
+                  ? buttonStyles.toggleOn
+                  : buttonStyles.toggleOff
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full ${
+                  buttonStyles.toggleThumb
+                } transition-transform ${
+                  siteSettings.ShowPlayerToolbar
+                    ? buttonStyles.toggleThumbOn
+                    : buttonStyles.toggleThumbOff
+                }`}
+              />
+            </button>
           </div>
         </div>
       </details>
