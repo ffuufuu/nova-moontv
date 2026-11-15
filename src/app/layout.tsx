@@ -180,7 +180,7 @@ export default async function RootLayout({
     }));
     fluidSearch = config.SiteConfig.FluidSearch;
     enableComments = config.SiteConfig.EnableComments;
-    showPlayerToolbar = config.SiteConfig.ShowPlayerToolbar !== false;
+    showPlayerToolbar = config.SiteConfig.ShowPlayerToolbar === true;
     danmakuAutoLoadDefault = config.SiteConfig.DanmakuAutoLoadDefault !== false;
     recommendationDataSource =
       config.SiteConfig.RecommendationDataSource || 'Mixed';

@@ -11762,7 +11762,7 @@ const SiteConfigComponent = ({
           config.SiteConfig.MagnetAcgripReverseProxy || '',
         MagnetNyaaReverseProxy: config.SiteConfig.MagnetNyaaReverseProxy || '',
         EnableComments: config.SiteConfig.EnableComments || false,
-        ShowPlayerToolbar: config.SiteConfig.ShowPlayerToolbar !== false,
+        ShowPlayerToolbar: config.SiteConfig.ShowPlayerToolbar === true,
         AnnouncementDisplayMode:
           config.SiteConfig.AnnouncementDisplayMode === 'every'
             ? 'every'

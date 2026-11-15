@@ -10,7 +10,7 @@ export function useShowPlayerToolbar(): boolean {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const runtimeConfig = (window as any).RUNTIME_CONFIG as RuntimeConfig;
-      setShowToolbar(runtimeConfig?.SHOW_PLAYER_TOOLBAR !== false);
+      setShowToolbar(runtimeConfig?.SHOW_PLAYER_TOOLBAR === true);
     }
   }, []);
 
