@@ -123,6 +123,7 @@ import DoubanComments from '@/components/DoubanComments';
 import DownloadEpisodeSelector from '@/components/DownloadEpisodeSelector';
 import Drawer from '@/components/Drawer';
 import EpisodeSelector from '@/components/EpisodeSelector';
+import FullscreenEpisodeDrawer from '@/components/FullscreenEpisodeDrawer';
 import LoadingStyle, {
   LoadingErrorStyle,
   type LoadingStep,
@@ -2415,6 +2416,7 @@ function PlayPageClient() {
   // 折叠状态（仅在 lg 及以上屏幕有效）
   const [isEpisodeSelectorCollapsed, setIsEpisodeSelectorCollapsed] =
     useState(false);
+  const [fsEpisodeDrawerOpen, setFsEpisodeDrawerOpen] = useState(false);
 
   // 下载选集面板显示状态
   const [showDownloadSelector, setShowDownloadSelector] = useState(false);
@@ -8468,6 +8470,15 @@ function PlayPageClient() {
           // 控制栏配置
           controls: [
             {
+              position: 'right',
+              index: 90,
+              html: '<i class="art-icon flex"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="4" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="6" rx="1.2" stroke="currentColor" stroke-width="2"/></svg></i>',
+              tooltip: '选集',
+              click: function () {
+                setFsEpisodeDrawerOpen(true);
+              },
+            },
+            {
               position: 'left',
               index: 40,
               html: `<i class="art-icon flex quick-forward-control"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m16 17 5-5-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></i>`,
@@ -11689,6 +11700,18 @@ function PlayPageClient() {
             </div>
           </div>
         </div>
+
+        <FullscreenEpisodeDrawer
+          open={fsEpisodeDrawerOpen}
+          onClose={() => setFsEpisodeDrawerOpen(false)}
+          totalEpisodes={totalEpisodes}
+          episodesTitles={detail?.episodes_titles || []}
+          currentEpisodeIndex={currentEpisodeIndex}
+          onEpisodeChange={handleEpisodeChange}
+          sources={availableSources}
+          currentSource={currentSource}
+          onSourceChange={handleSourceChange}
+        />
 
         {!isDirectPlay && (
           <>
