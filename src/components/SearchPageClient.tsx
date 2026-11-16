@@ -3,12 +3,9 @@
 
 import {
   ChevronUp,
-  Film,
   Grid2x2,
-  HardDrive,
   List,
   ListVideo,
-  Magnet,
   RefreshCw,
   Search,
   X,
@@ -42,7 +39,6 @@ import {
 import { processImageUrl } from '@/lib/utils';
 
 import AcgSearch from '@/components/AcgSearch';
-import CapsuleSwitch from '@/components/CapsuleSwitch';
 import ContinueWatching from '@/components/ContinueWatching';
 import ImageViewer from '@/components/ImageViewer';
 import PageLayout from '@/components/PageLayout';
@@ -1315,37 +1311,14 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
   useEffect(() => {
     if (!featureFlagsReady) return;
 
-    const typeParam = searchParams.get('type');
     const query = searchParams.get('q');
-
-    if (isSpecialEntry) {
-      // /under 特殊源入口只有影视搜索；忽略 URL 里的 type
-      setActiveTab('video');
-    } else if (typeParam === 'pansou') {
-      if (netdiskSearchEnabled) {
-        setActiveTab('pansou');
-      } else {
-        setActiveTab('video');
-      }
-    } else if (typeParam === 'acg') {
-      if (magnetSearchEnabled) {
-        setActiveTab('acg');
-      } else {
-        setActiveTab('video');
-      }
-    } else {
-      setActiveTab('video');
-    }
+    // 只保留影视搜索，网盘/磁力入口已移除
+    setActiveTab('video');
 
     if (!query) {
       document.getElementById('searchInput')?.focus();
     }
-  }, [
-    searchParams,
-    netdiskSearchEnabled,
-    magnetSearchEnabled,
-    featureFlagsReady,
-  ]);
+  }, [searchParams, featureFlagsReady]);
 
   useEffect(() => {
     // 等待转换器和私人影库搜索设置初始化完成
@@ -1647,32 +1620,6 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
     privateLibraryOnly,
   ]);
 
-  useEffect(() => {
-    if (!featureFlagsReady) return;
-
-    const typeParam = searchParams.get('type');
-    const query = searchParams.get('q');
-    if (!query || !query.trim()) return;
-
-    if (typeParam === 'pansou' && netdiskSearchEnabled) {
-      setSearchQuery(query);
-      setShowResults(true);
-      setTimeout(() => {
-        setTriggerPansouSearch((prev) => !prev);
-      }, 100);
-    } else if (typeParam === 'acg' && magnetSearchEnabled) {
-      setSearchQuery(query);
-      setShowResults(true);
-      setTimeout(() => {
-        setTriggerAcgSearch((prev) => !prev);
-      }, 100);
-    }
-  }, [
-    searchParams,
-    netdiskSearchEnabled,
-    magnetSearchEnabled,
-    featureFlagsReady,
-  ]);
 
   // 组件卸载时，关闭可能存在的连接
   useEffect(() => {
@@ -1987,54 +1934,13 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                   setShowResults(true);
                   setShowSuggestions(false);
                   router.push(
-                    `${searchBase}?q=${encodeURIComponent(trimmed)}&type=${activeTab}`
+                    `${searchBase}?q=${encodeURIComponent(trimmed)}`
                   );
-                  if (activeTab === 'pansou') {
-                    setTriggerPansouSearch((prev) => !prev);
-                  } else if (activeTab === 'acg') {
-                    setTriggerAcgSearch((prev) => !prev);
-                  }
                 }}
               />
             </div>
           </form>
 
-          {/* 选项卡：特殊源入口（/under）只有影视搜索，整块隐藏 */}
-          {!isSpecialEntry && (
-            <div className='flex justify-center mt-6'>
-              <CapsuleSwitch
-                options={[
-                  {
-                    label: '影视搜索',
-                    value: 'video',
-                    icon: <Film size={16} />,
-                  },
-                  ...(netdiskSearchEnabled
-                    ? [
-                        {
-                          label: '网盘搜索',
-                          value: 'pansou' as const,
-                          icon: <HardDrive size={16} />,
-                        },
-                      ]
-                    : []),
-                  ...(magnetSearchEnabled
-                    ? [
-                        {
-                          label: '动漫磁力',
-                          value: 'acg' as const,
-                          icon: <Magnet size={16} />,
-                        },
-                      ]
-                    : []),
-                ]}
-                active={activeTab}
-                onChange={(value) =>
-                  handleTabChange(value as 'video' | 'pansou' | 'acg')
-                }
-              />
-            </div>
-          )}
 
           {/* 特殊源入口（/under）：不挂网盘/磁力 tab，改为提供一个「源站寻片」
               特殊源版本的入口；进入后只浏览/搜索特殊源。
@@ -2053,15 +1959,6 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
             </div>
           )}
 
-          {activeTab === 'pansou' &&
-            netdiskSearchEnabled &&
-            renderPansouCloudTypeFilter()}
-
-          {activeTab === 'acg' && magnetSearchEnabled && (
-            <div className='mt-4'>
-              <AcgSearch keyword={searchQuery} controlsOnly />
-            </div>
-          )}
 
           {activeTab === 'video' && !showResults && (
             <div className='mx-auto mt-4 flex max-w-2xl justify-end'>
