@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
-import { getAvailableApiSites, getCacheTime, getConfig } from '@/lib/config';
+import { getAvailableApiSites, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
 import { getProxyToken } from '@/lib/emby-token';
 import { hasFeaturePermission } from '@/lib/permissions';
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const privateOnly = searchParams.get('privateOnly') === '1';
 
   if (!query) {
-    const cacheTime = await getCacheTime();
+    const cacheTime = 60; // 60 秒短缓存：删源/改源后最多 1 分钟生效
     return NextResponse.json(
       { results: [] },
       {
@@ -288,7 +288,7 @@ export async function GET(request: NextRequest) {
       return weightB - weightA;
     });
 
-    const cacheTime = await getCacheTime();
+    const cacheTime = 60; // 60 秒短缓存：删源/改源后最多 1 分钟生效
 
     if (flattenedResults.length === 0) {
       // no cache if empty
