@@ -871,17 +871,30 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storageKey = `search-scroll:${scrollRestoreKey}`;
-    const readSaved = () => {
+    const leaveKey = `search-scroll-leave:${scrollRestoreKey}`;
+    const readNum = (k: string) => {
       try {
-        return Number(sessionStorage.getItem(storageKey) || '0');
+        return Number(sessionStorage.getItem(k) || '0');
       } catch {
         return 0;
       }
     };
-    let saved = readSaved();
+    const takeLeave = () => {
+      try {
+        const raw = sessionStorage.getItem(leaveKey);
+        if (raw === null) return 0;
+        sessionStorage.removeItem(leaveKey);
+        return Number(raw) || 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    // 优先用「离开前那一刻」的位置，没有再用滚动过程中记的位置
+    let saved = takeLeave() || readNum(storageKey);
     let userScrolled = false;
 
-    // 保存：只记录用户自己滚出来的位置，避免被程序化滚动（返回时的复位）覆盖
+    // 保存：只记录用户自己滚出来的位置，避免被返回时的复位覆盖
     const saveNow = () => {
       if (!userScrolled) return;
       try {
@@ -902,9 +915,14 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
     };
     document.body.addEventListener('scroll', saveScroll, { passive: true });
 
-    // 点卡片离开前先落盘，防止节流还没触发就跳走
+    // 点击（进详情、进播放等）之前，把当前位置单独存一份，返回时以它为准
     const onClickCapture = () => {
-      if (userScrolled) saveNow();
+      try {
+        sessionStorage.setItem(
+          leaveKey,
+          String(document.body.scrollTop || 0)
+        );
+      } catch {}
     };
     document.addEventListener('click', onClickCapture, true);
 
@@ -945,10 +963,11 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
       }
     };
 
-    // 浏览器前进/后退时重读记录再恢复（组件可能未重新挂载）
+    // 浏览器前进/后退时重新恢复（组件可能未重新挂载）
     const onPopState = () => {
       userScrolled = false;
-      saved = readSaved();
+      const leave = takeLeave();
+      if (leave > 60) saved = leave;
       startRestore(120);
     };
     window.addEventListener('popstate', onPopState);
