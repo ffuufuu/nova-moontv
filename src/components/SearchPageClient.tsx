@@ -864,6 +864,82 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
     };
   }, [advancedOpen]);
 
+  // 搜索页滚动位置记忆：从详情/播放页返回时停在原处，而不是跳回顶部
+  const scrollRestoreKey = `${searchParams.get('q') || ''}|${
+    searchParams.get('type') || ''
+  }`;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storageKey = `search-scroll:${scrollRestoreKey}`;
+    let saved = 0;
+    try {
+      saved = Number(sessionStorage.getItem(storageKey) || '0');
+    } catch {}
+
+    // 本站以 body 为滚动容器：持续记录当前位置
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+    const saveScroll = () => {
+      if (saveTimer) return;
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        try {
+          sessionStorage.setItem(
+            storageKey,
+            String(document.body.scrollTop || 0)
+          );
+        } catch {}
+      }, 150);
+    };
+    document.body.addEventListener('scroll', saveScroll, {
+      passive: true,
+    });
+
+    // 有记录时等内容渲染出来后滚回原位；用户一旦主动滚动就放弃恢复
+    let cancelled = false;
+    const cancelRestore = () => {
+      cancelled = true;
+    };
+    window.addEventListener('wheel', cancelRestore, { passive: true });
+    window.addEventListener('touchstart', cancelRestore, { passive: true });
+    window.addEventListener('keydown', cancelRestore);
+
+    let tries = 0;
+    const restore = () => {
+      if (cancelled) return;
+      const max = (document.body.scrollHeight || 0) - window.innerHeight;
+      if (max > 60) {
+        const target = Math.min(saved, max);
+        document.body.scrollTop = target;
+        document.documentElement.scrollTop = target;
+        window.scrollTo(0, target);
+      }
+      tries += 1;
+      if (tries >= 30) return;
+      setTimeout(restore, 120);
+    };
+
+    // 浏览器前进/后退时重新尝试恢复（组件可能未重新挂载）
+    const onPopState = () => {
+      cancelled = false;
+      tries = 0;
+      setTimeout(restore, 120);
+    };
+    window.addEventListener('popstate', onPopState);
+
+    if (saved > 60) {
+      setTimeout(restore, 80);
+    }
+
+    return () => {
+      document.body.removeEventListener('scroll', saveScroll);
+      window.removeEventListener('wheel', cancelRestore);
+      window.removeEventListener('touchstart', cancelRestore);
+      window.removeEventListener('keydown', cancelRestore);
+      window.removeEventListener('popstate', onPopState);
+      if (saveTimer) clearTimeout(saveTimer);
+    };
+  }, [scrollRestoreKey]);
+
   const getSearchResultUrl = (params: {
     title: string;
     year?: string;
