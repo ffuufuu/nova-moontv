@@ -125,16 +125,13 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
             cache: 'no-store',
           });
           const data = await res.json();
-          if (
-            data &&
-            !data.error &&
-            data.checkedAt &&
-            data.checkedAt !== before
-          ) {
+          if (data && !data.error) {
             setReport(data as UpstreamReport);
-            setChecking(false);
-            stopPoll();
-            return;
+            if (data.checkedAt && data.checkedAt !== before) {
+              setChecking(false);
+              stopPoll();
+              return;
+            }
           }
         } catch {}
         if (tries >= 40) {
