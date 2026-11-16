@@ -871,76 +871,98 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storageKey = `search-scroll:${scrollRestoreKey}`;
-    let saved = 0;
-    try {
-      saved = Number(sessionStorage.getItem(storageKey) || '0');
-    } catch {}
+    const readSaved = () => {
+      try {
+        return Number(sessionStorage.getItem(storageKey) || '0');
+      } catch {
+        return 0;
+      }
+    };
+    let saved = readSaved();
+    let userScrolled = false;
 
-    // 本站以 body 为滚动容器：持续记录当前位置
+    // 保存：只记录用户自己滚出来的位置，避免被程序化滚动（返回时的复位）覆盖
+    const saveNow = () => {
+      if (!userScrolled) return;
+      try {
+        sessionStorage.setItem(
+          storageKey,
+          String(document.body.scrollTop || 0)
+        );
+      } catch {}
+    };
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
     const saveScroll = () => {
+      if (!userScrolled) return;
       if (saveTimer) return;
       saveTimer = setTimeout(() => {
         saveTimer = null;
-        try {
-          sessionStorage.setItem(
-            storageKey,
-            String(document.body.scrollTop || 0)
-          );
-        } catch {}
+        saveNow();
       }, 150);
     };
-    document.body.addEventListener('scroll', saveScroll, {
-      passive: true,
-    });
+    document.body.addEventListener('scroll', saveScroll, { passive: true });
 
-    // 有记录时等内容渲染出来后滚回原位；用户一旦主动滚动就放弃恢复
-    let cancelled = false;
-    const cancelRestore = () => {
-      cancelled = true;
+    // 点卡片离开前先落盘，防止节流还没触发就跳走
+    const onClickCapture = () => {
+      if (userScrolled) saveNow();
     };
-    window.addEventListener('wheel', cancelRestore, { passive: true });
-    window.addEventListener('touchstart', cancelRestore, { passive: true });
-    window.addEventListener('keydown', cancelRestore);
+    document.addEventListener('click', onClickCapture, true);
 
-    let tries = 0;
-    const restore = () => {
-      if (cancelled) return;
+    // 用户真的开始操作，就停止恢复、转入正常记录
+    const markUserScroll = () => {
+      userScrolled = true;
+    };
+    window.addEventListener('wheel', markUserScroll, { passive: true });
+    window.addEventListener('touchmove', markUserScroll, { passive: true });
+    window.addEventListener('keydown', markUserScroll);
+
+    // 恢复：返回后持续把位置顶回原处，直到内容渲染完或用户自己动手
+    let raf = 0;
+    let startedAt = 0;
+    const hold = () => {
+      if (userScrolled) return;
       const max = (document.body.scrollHeight || 0) - window.innerHeight;
       if (max > 60) {
-        // 结果还在陆续渲染，高度会变；每次都往目标位置顶一次，
-        // 浏览器会自动截断到当前可滚动上限，内容撑开后自然到位。
-        const current = document.body.scrollTop || 0;
         const target = Math.min(saved, max);
-        if (Math.abs(current - target) > 8) {
+        if (Math.abs((document.body.scrollTop || 0) - target) > 8) {
           document.body.scrollTop = target;
-          document.documentElement.scrollTop = target;
-          window.scrollTo(0, target);
         }
       }
-      tries += 1;
-      if (tries >= 150) return;
-      setTimeout(restore, 200);
+      if (performance.now() - startedAt > 15000) return;
+      raf = requestAnimationFrame(hold);
+    };
+    const startRestore = (delay = 0) => {
+      cancelAnimationFrame(raf);
+      if (saved <= 60) return;
+      const run = () => {
+        startedAt = performance.now();
+        raf = requestAnimationFrame(hold);
+      };
+      if (delay > 0) {
+        setTimeout(run, delay);
+      } else {
+        run();
+      }
     };
 
-    // 浏览器前进/后退时重新尝试恢复（组件可能未重新挂载）
+    // 浏览器前进/后退时重读记录再恢复（组件可能未重新挂载）
     const onPopState = () => {
-      cancelled = false;
-      tries = 0;
-      setTimeout(restore, 120);
+      userScrolled = false;
+      saved = readSaved();
+      startRestore(120);
     };
     window.addEventListener('popstate', onPopState);
 
-    if (saved > 60) {
-      setTimeout(restore, 80);
-    }
+    startRestore(80);
 
     return () => {
       document.body.removeEventListener('scroll', saveScroll);
-      window.removeEventListener('wheel', cancelRestore);
-      window.removeEventListener('touchstart', cancelRestore);
-      window.removeEventListener('keydown', cancelRestore);
+      document.removeEventListener('click', onClickCapture, true);
+      window.removeEventListener('wheel', markUserScroll);
+      window.removeEventListener('touchmove', markUserScroll);
+      window.removeEventListener('keydown', markUserScroll);
       window.removeEventListener('popstate', onPopState);
+      cancelAnimationFrame(raf);
       if (saveTimer) clearTimeout(saveTimer);
     };
   }, [scrollRestoreKey]);
