@@ -919,8 +919,8 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
         }
       }
       tries += 1;
-      if (tries >= 60) return;
-      setTimeout(restore, 120);
+      if (tries >= 150) return;
+      setTimeout(restore, 200);
     };
 
     // 浏览器前进/后退时重新尝试恢复（组件可能未重新挂载）
