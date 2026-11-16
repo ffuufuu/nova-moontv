@@ -891,7 +891,14 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
     };
 
     // 优先用「离开前那一刻」的位置，没有再用滚动过程中记的位置
-    let saved = takeLeave() || readNum(storageKey);
+    const leaveOnce = takeLeave();
+    let saved = leaveOnce > 60 ? leaveOnce : readNum(storageKey);
+    if (leaveOnce > 60) {
+      // 页面可能重新挂载，回写一份，避免第二次读取时已空而回落到旧值
+      try {
+        sessionStorage.setItem(storageKey, String(leaveOnce));
+      } catch {}
+    }
     let userScrolled = false;
 
     // 保存：只记录用户自己滚出来的位置，避免被返回时的复位覆盖
@@ -967,7 +974,12 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
     const onPopState = () => {
       userScrolled = false;
       const leave = takeLeave();
-      if (leave > 60) saved = leave;
+      if (leave > 60) {
+        saved = leave;
+        try {
+          sessionStorage.setItem(storageKey, String(leave));
+        } catch {}
+      }
       startRestore(120);
     };
     window.addEventListener('popstate', onPopState);
