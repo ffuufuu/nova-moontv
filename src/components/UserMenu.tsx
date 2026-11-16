@@ -227,7 +227,7 @@ export const UserMenu: React.FC = () => {
     useState(false);
   const [searchTraditionalToSimplified, setSearchTraditionalToSimplified] =
     useState(false);
-  const [exactSearch, setExactSearch] = useState(true);
+  const [exactSearch, setExactSearch] = useState(false);
   const [maxConcurrentDownloads, setMaxConcurrentDownloads] = useState(6);
   const [downloadThreadsPerTask, setDownloadThreadsPerTask] = useState(6);
   const [downloadSegmentTimeout, setDownloadSegmentTimeout] = useState(30000);

@@ -135,7 +135,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
   // 是否使用了缓存结果
   const [isFromCache, setIsFromCache] = useState(false);
   // 精确搜索开关
-  const [exactSearch, setExactSearch] = useState(true);
+  const [exactSearch, setExactSearch] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [privateLibraryOnly, setPrivateLibraryOnly] = useState(false);
   const [privateLibraryOnlyReady, setPrivateLibraryOnlyReady] = useState(false);
