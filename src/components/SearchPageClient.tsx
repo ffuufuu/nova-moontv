@@ -908,13 +908,18 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
       if (cancelled) return;
       const max = (document.body.scrollHeight || 0) - window.innerHeight;
       if (max > 60) {
+        // 结果还在陆续渲染，高度会变；每次都往目标位置顶一次，
+        // 浏览器会自动截断到当前可滚动上限，内容撑开后自然到位。
+        const current = document.body.scrollTop || 0;
         const target = Math.min(saved, max);
-        document.body.scrollTop = target;
-        document.documentElement.scrollTop = target;
-        window.scrollTo(0, target);
+        if (Math.abs(current - target) > 8) {
+          document.body.scrollTop = target;
+          document.documentElement.scrollTop = target;
+          window.scrollTo(0, target);
+        }
       }
       tries += 1;
-      if (tries >= 30) return;
+      if (tries >= 60) return;
       setTimeout(restore, 120);
     };
 
