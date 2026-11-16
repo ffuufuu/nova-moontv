@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { CURRENT_VERSION } from '@/lib/version';
 
@@ -68,7 +69,12 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
   const [checking, setChecking] = useState(false);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const stopPoll = () => {
     if (pollRef.current) {
@@ -141,12 +147,12 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const version = report?.ourVersion || CURRENT_VERSION;
 
-  return (
-    <div className='fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6'>
+  const overlay = (
+    <div className='fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6'>
       <div
         className='absolute inset-0 bg-black/60 backdrop-blur-sm'
         onClick={onClose}
@@ -341,4 +347,6 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 };
