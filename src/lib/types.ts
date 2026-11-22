@@ -21,6 +21,10 @@ export interface PlayRecord {
   /** 是否短剧（短剧竖屏页写入；普通播放页按 CMS type_name/class 判断）。
       继续观看据此改用 /duanju/play 进去。 */
   is_duanju?: boolean;
+  /** 多线路源（如 tvbox）的线路标识：下次播放同一视频从这条线路续播 */
+  line?: string;
+  /** 源站标题完全变更后置为失效（收藏失效检测用） */
+  is_invalid?: boolean;
 }
 
 // 收藏数据结构
