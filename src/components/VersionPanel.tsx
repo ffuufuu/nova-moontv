@@ -34,7 +34,13 @@ interface UpstreamReport {
   latestMessage: string;
   upToDate: boolean;
   commits: UpstreamCommit[];
-  summary: { total: number; safe: number; manual: number; skip: number };
+  summary: {
+    total: number;
+    safe: number;
+    manual: number;
+    skip: number;
+    level?: 'file' | 'commit';
+  };
   sync?: {
     auto: boolean;
     cadence: string;
@@ -48,6 +54,7 @@ interface UpstreamReport {
       files: number;
       highRisk: number;
       safe: number;
+      skipped?: number;
     };
   };
 }
@@ -164,12 +171,16 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
   const version = report?.ourVersion || CURRENT_VERSION;
 
   const overlay = (
-    <div className='fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6'>
+    <div className='fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-6'>
       <div
         className='absolute inset-0 bg-black/60 backdrop-blur-sm'
         onClick={onClose}
       />
-      <div className='relative w-full max-w-lg max-h-[88vh] flex flex-col rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl overflow-hidden'>
+      <div className='relative w-full sm:max-w-lg max-h-[80vh] sm:max-h-[86vh] flex flex-col rounded-t-2xl sm:rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]'>
+        {/* 抽屉抓手（仅手机） */}
+        <div className='sm:hidden pt-2 pb-1 flex justify-center flex-shrink-0'>
+          <span className='h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700' />
+        </div>
         {/* 头部 */}
         <div className='flex items-center justify-between px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-800 flex-shrink-0'>
           <div className='flex items-center gap-2 min-w-0'>
@@ -254,13 +265,13 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
                   </p>
                   <div className='mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs'>
                     <span className='text-emerald-700 dark:text-emerald-300'>
-                      可安全摘 {report.summary.safe}
+                      可机器合 {report.summary.safe}
                     </span>
                     <span className='text-amber-700 dark:text-amber-300'>
-                      需手工 {report.summary.manual}
+                      需人工 {report.summary.manual}
                     </span>
                     <span className='text-rose-700 dark:text-rose-300'>
-                      建议别动 {report.summary.skip}
+                      跳过 {report.summary.skip}
                     </span>
                   </div>
                 </div>
@@ -290,7 +301,7 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
                     <span className='text-neutral-500'>该版增量</span>
                     <span className='text-[11px] text-neutral-500'>
                       {report.sync.patch && report.sync.patch.available
-                        ? `共 ${report.sync.patch.files} 文件 · 高危 ${report.sync.patch.highRisk} · 可摘 ${report.sync.patch.safe}`
+                        ? `共 ${report.sync.patch.files} 文件 · 可机器合 ${report.sync.patch.safe} · 需人工 ${report.sync.patch.highRisk}`
                         : '尚未生成补丁'}
                     </span>
                   </div>
