@@ -3251,6 +3251,30 @@ function PlayPageClient() {
   };
 
   // 播放源优选函数
+  // ===== B3 记住上次播放成功的源（本地记忆，按标题存） =====
+  const SOURCE_MEMORY_KEY = 'moontv:lastGoodSource';
+  const readSourceMemory = useCallback((): Record<string, string> => {
+    try {
+      const raw = localStorage.getItem(SOURCE_MEMORY_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return typeof parsed === 'object' && parsed ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, []);
+  const saveSourceMemory = useCallback((title: string, source: string) => {
+    if (!title || !source) return;
+    try {
+      const all = readSourceMemory();
+      all[title] = source;
+      const keys = Object.keys(all);
+      if (keys.length > 300) {
+        keys.slice(0, keys.length - 300).forEach((k) => delete all[k]);
+      }
+      localStorage.setItem(SOURCE_MEMORY_KEY, JSON.stringify(all));
+    } catch {}
+  }, [readSourceMemory]);
+
   const preferBestSource = async (
     sources: SearchResult[]
   ): Promise<SearchResult> => {
@@ -5626,6 +5650,17 @@ function PlayPageClient() {
         return;
       }
 
+      // 未指定源时，优先复用上次播放成功的源
+      if (!detailData && !currentSource) {
+        try {
+          const remembered = readSourceMemory()[searchTitle || videoTitle];
+          const hit = remembered ? sourcesInfo.find((item) => item.source === remembered) : undefined;
+          if (hit) {
+            console.log('[Play] 复用上次播放成功的源:', hit.source);
+            detailData = hit;
+          }
+        } catch {}
+      }
       if (!detailData) {
         detailData = sourcesInfo[0];
       }
@@ -7852,6 +7887,8 @@ function PlayPageClient() {
 
               // 监听Manifest加载完成事件，启动xiaoya链接定时刷新
               hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                // 记录该标题可用源，下次进来自动复用
+                saveSourceMemory(videoTitleRef.current || videoTitle, currentSourceRef.current as string);
                 console.log('[HLS] Manifest解析完成');
 
                 const player = artPlayerRef.current;
