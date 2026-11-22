@@ -18,7 +18,8 @@ import re
 import subprocess
 import sys
 
-IMPORT_RE = re.compile(r"from\s+'(@/(?:lib|components|app)/[^']+)'")
+IMPORT_RE = re.compile(r"from\s+'([^']+)'")
+LOCAL_PREFIXES = ('@/', './', '../', 'src/')
 EXTS = ('', '.ts', '.tsx', '/index.ts', '/index.tsx')
 
 
@@ -30,8 +31,12 @@ def exists_in_tree(path):
     return any(os.path.exists(path + e) for e in EXTS)
 
 
-def resolve_import(spec):
-    return 'src/' + spec[2:]
+def resolve_import(spec, importer=''):
+    """把 import 路径换算成相对仓库根的路径。"""
+    if spec.startswith('@/'):
+        return 'src/' + spec[2:]
+    base = os.path.dirname(importer)
+    return os.path.normpath(os.path.join(base, spec))
 
 
 def read_conf_prefixes(conf):
@@ -106,7 +111,8 @@ def main():
             src = content_of(f)
             if not src:
                 continue
-            deps = {resolve_import(m) for m in IMPORT_RE.findall(src)}
+            deps = {resolve_import(m, f) for m in IMPORT_RE.findall(src)
+                    if m.startswith(LOCAL_PREFIXES)}
             missing = [d for d in deps
                        if not exists_in_tree(d) and d not in auto_set]
             if missing:

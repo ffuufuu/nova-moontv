@@ -1,0 +1,1346 @@
+diff --git a/src/app/api/favorites/route.ts b/src/app/api/favorites/route.ts
+index 8a8f2f3..997ea3e 100644
+--- a/src/app/api/favorites/route.ts
++++ b/src/app/api/favorites/route.ts
+@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
+ 
+     const finalFavorite = {
+       ...favorite,
++      is_invalid: false,
+       save_time: favorite.save_time ?? Date.now(),
+     } as Favorite;
+ 
+diff --git a/src/app/api/live/channels/route.ts b/src/app/api/live/channels/route.ts
+index 4208794..9b2bd64 100644
+--- a/src/app/api/live/channels/route.ts
++++ b/src/app/api/live/channels/route.ts
+@@ -4,6 +4,7 @@ import { getCachedLiveChannels } from '@/lib/live';
+ import { requireFeaturePermission } from '@/lib/permissions';
+ 
+ export const runtime = 'nodejs';
++export const maxDuration = 240;
+ 
+ export async function GET(request: NextRequest) {
+   try {
+diff --git a/src/app/api/playrecords/route.ts b/src/app/api/playrecords/route.ts
+index 4cadcb1..66fb643 100644
+--- a/src/app/api/playrecords/route.ts
++++ b/src/app/api/playrecords/route.ts
+@@ -102,8 +102,12 @@ export async function POST(request: NextRequest) {
+       );
+     }
+ 
++    const previous = source.startsWith('tvbox:') && !record.line
++      ? await db.getPlayRecord(authInfo.username, source, id)
++      : null;
+     const finalRecord = {
+       ...record,
++      line: record.line || previous?.line,
+       save_time: record.save_time ?? Date.now(),
+     } as PlayRecord;
+ 
+diff --git a/src/app/api/tvbox/config/route.ts b/src/app/api/tvbox/config/route.ts
+index fa64adf..64315ce 100644
+--- a/src/app/api/tvbox/config/route.ts
++++ b/src/app/api/tvbox/config/route.ts
+@@ -11,10 +11,7 @@ export async function GET(request: NextRequest) {
+   // 验证用户登录
+   const authInfo = getAuthInfoFromCookie(request);
+   if (!authInfo || !authInfo.username) {
+-    return NextResponse.json(
+-      { error: 'Unauthorized' },
+-      { status: 401 }
+-    );
++    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+   }
+ 
+   // 检查是否开启订阅功能
+@@ -41,11 +38,14 @@ export async function GET(request: NextRequest) {
+   const searchParams = request.nextUrl.searchParams;
+   const clientOrigin = searchParams.get('origin');
+   const adFilter = searchParams.get('adFilter') === 'true'; // 获取去广告参数
++  const includeTVBox = searchParams.get('includeTVBox') === 'true';
+ 
+   const baseUrl = siteBase || clientOrigin || request.nextUrl.origin;
+ 
+   // 构建订阅链接，包含 adFilter 参数
+-  const subscribeUrl = `${baseUrl}/api/tvbox/subscribe?token=${encodeURIComponent(subscribeToken)}&adFilter=${adFilter}`;
++  const subscribeUrl = `${baseUrl}/api/tvbox/subscribe?token=${encodeURIComponent(
++    subscribeToken
++  )}&adFilter=${adFilter}${includeTVBox ? '&includeTVBox=true' : ''}`;
+ 
+   return NextResponse.json(
+     {
+diff --git a/src/lib/bangumi-schedule-cache.server.ts b/src/lib/bangumi-schedule-cache.server.ts
+index c8e3659..e4ec15f 100644
+--- a/src/lib/bangumi-schedule-cache.server.ts
++++ b/src/lib/bangumi-schedule-cache.server.ts
+@@ -4,7 +4,8 @@ import { DbManager } from '@/lib/db';
+ 
+ const MEMORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+ const DATABASE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+-const DATABASE_CACHE_KEY_PREFIX = 'bangumi:schedule:';
++// 解析器升级后弃用旧缓存，避免旧版空时刻表持续命中 30 天。
++const DATABASE_CACHE_KEY_PREFIX = 'bangumi:schedule:v2:';
+ 
+ export interface BangumiScheduleCacheEntry<T> {
+   season: string;
+@@ -33,9 +34,14 @@ function isValidEntry<T>(
+   );
+ }
+ 
+-export function getBangumiScheduleMemoryCache<T>(season: string, year: number): T | null {
++export function getBangumiScheduleMemoryCache<T>(
++  season: string,
++  year: number
++): T | null {
+   const key = getCacheKey(season, year);
+-  const entry = memoryCache.get(key) as BangumiScheduleCacheEntry<T> | undefined;
++  const entry = memoryCache.get(key) as
++    | BangumiScheduleCacheEntry<T>
++    | undefined;
+   if (!entry || !isValidEntry(entry, season, year, MEMORY_CACHE_TTL_MS)) {
+     memoryCache.delete(key);
+     return null;
+@@ -58,7 +64,9 @@ export async function getBangumiScheduleDatabaseCache<T>(
+ ): Promise<T | null> {
+   try {
+     const raw = await new DbManager().getGlobalValue(getCacheKey(season, year));
+-    const entry = raw ? (JSON.parse(raw) as BangumiScheduleCacheEntry<T>) : null;
++    const entry = raw
++      ? (JSON.parse(raw) as BangumiScheduleCacheEntry<T>)
++      : null;
+     if (!isValidEntry(entry, season, year, DATABASE_CACHE_TTL_MS)) return null;
+     setBangumiScheduleMemoryCache(season, year, entry.data, entry.cachedAt);
+     return entry.data;
+diff --git a/src/lib/bangumi-schedule.server.ts b/src/lib/bangumi-schedule.server.ts
+index f32580f..1d9c9c1 100644
+--- a/src/lib/bangumi-schedule.server.ts
++++ b/src/lib/bangumi-schedule.server.ts
+@@ -1,9 +1,11 @@
+ /* eslint-disable @typescript-eslint/no-explicit-any */
+ 
+ import * as cheerio from 'cheerio/slim';
+-import { safeFetch } from './safe-http';
++
+ import { isCloudflareEnvironment } from '@/lib/bangumi.server';
+ 
++import { safeFetch } from './safe-http';
++
+ /**
+  * Bangumi 番剧每日放送时刻表 —— 服务端实现。
+  * 移植自参考实现 /data/projects/test/deliverable（livechart.py + bgm.py）：
+@@ -122,34 +124,53 @@ export async function fetchLiveChart(
+ 
+ /**
+  * 解析 LiveChart HTML，返回卡片列表。
+- * 与参考实现 parse() 对齐：取 article.anime 的 data-* 属性与 .episode-countdown time[data-timestamp]。
++ * 兼容旧版 article.anime 与新版 article[data-anime-id] 的标题和倒计时属性。
++ * 仅使用集数倒计时，不把首播日期当作每周固定放送时间。
+  */
+ export function parseLiveChart(html: string): LiveChartCard[] {
+   const $ = cheerio.load(html);
+   const cards: LiveChartCard[] = [];
+-  $('article.anime').each((_i, el) => {
++  $('article.anime, article[data-anime-id]').each((_i, el) => {
+     const card = $(el);
+     const d: LiveChartCard = {
+       anime_id: card.attr('data-anime-id'),
+-      native: (card.attr('data-native') || '').trim(),
+-      english: (card.attr('data-english') || '').trim(),
+-      romaji: (card.attr('data-romaji') || '').trim(),
++      native: (
++        card.attr('data-anime-item-native-title') ||
++        card.attr('data-native') ||
++        ''
++      ).trim(),
++      english: (
++        card.attr('data-anime-item-english-title') ||
++        card.attr('data-english') ||
++        ''
++      ).trim(),
++      romaji: (
++        card.attr('data-anime-item-romanized-native-title') ||
++        card.attr('data-romaji') ||
++        ''
++      ).trim(),
+       next_ts: null,
+       date_txt: '',
+     };
+-    const cnt = card.find('.episode-countdown').first();
+-    if (cnt.length) {
+-      const tm = cnt.find('time').first();
+-      const ts = tm.attr('data-timestamp');
+-      if (ts) {
+-        const n = Number(ts);
+-        if (Number.isFinite(n)) d.next_ts = n;
+-      }
++    const ts = card
++      .find(
++        '.episode-countdown time[data-timestamp], time[data-controller~="countdown"][data-timestamp]'
++      )
++      .first()
++      .attr('data-timestamp');
++    if (ts) {
++      const n = Number(ts);
++      if (Number.isFinite(n) && n > 0) d.next_ts = n;
+     }
+-    const de = card.find('.anime-date').first();
++    const de = card
++      .find('.anime-date, .lc-anime-details-card__premiere')
++      .first();
+     d.date_txt = de.text().replace(/\s+/g, ' ').trim();
+     cards.push(d);
+   });
++  if (cards.length === 0) {
++    throw new Error('LiveChart 页面未解析到番剧卡片，页面结构可能已变化');
++  }
+   return cards;
+ }
+ 
+@@ -159,10 +180,7 @@ function normalize(s: string): string {
+   out = out.replace(/\s+/g, '');
+   out = out
+     .toLowerCase()
+-    .replace(
+-      /2nd|second|Ⅱ|ＩＩ|2|第二|二|第2|2期|第2期|二期/g,
+-      ''
+-    );
++    .replace(/2nd|second|Ⅱ|ＩＩ|2|第二|二|第2|2期|第2期|二期/g, '');
+   out = out.replace(/[「」『』【】《》〈〉"'“”‘’()（）\-—]/g, '');
+   return out;
+ }
+diff --git a/src/lib/bangumi.client.ts b/src/lib/bangumi.client.ts
+index a58c9ff..76fcb48 100644
+--- a/src/lib/bangumi.client.ts
++++ b/src/lib/bangumi.client.ts
+@@ -6,9 +6,9 @@ export type AnimeDataSource =
+   | 'custom-baseurl'
+   | 'sakura';
+ 
+-/** 桜色镜像站：全域名镜像 bgm.tv → bangumi.lol */
+-export const BANGUMI_SAKURA_API_BASE_URL = 'https://api.bangumi.lol';
+-export const BANGUMI_SAKURA_SITE_URL = 'https://bangumi.lol';
++/** 镜像站：全域名镜像 bgm.tv → bgm.lat */
++export const BANGUMI_SAKURA_API_BASE_URL = 'https://api.bgm.lat';
++export const BANGUMI_SAKURA_SITE_URL = 'https://bgm.lat';
+ export const BANGUMI_OFFICIAL_SITE_URL = 'https://bgm.tv';
+ 
+ export function isValidAnimeDataSource(
+@@ -180,7 +180,7 @@ function buildBangumiUrl(source: AnimeDataSource, path: string): string {
+   }
+ }
+ 
+-/** 按当前动漫数据源生成 Bangumi 条目外链（桜色镜像站 → bangumi.lol） */
++/** 按当前动漫数据源生成 Bangumi 条目外链（镜像站 → bgm.lat） */
+ export function getBangumiSubjectUrl(id: string | number): string {
+   const origin =
+     getPrimaryAnimeDataSource() === 'sakura'
+diff --git a/src/lib/bangumi.server.ts b/src/lib/bangumi.server.ts
+index 0ad0519..5a80467 100644
+--- a/src/lib/bangumi.server.ts
++++ b/src/lib/bangumi.server.ts
+@@ -9,8 +9,8 @@ export type AnimeDataSource =
+   | 'sakura';
+ 
+ export const DEFAULT_BANGUMI_BASE_URL = 'https://api.bgm.tv';
+-/** 桜色镜像站 API */
+-export const BANGUMI_SAKURA_API_BASE_URL = 'https://api.bangumi.lol';
++/** 镜像站 API */
++export const BANGUMI_SAKURA_API_BASE_URL = 'https://api.bgm.lat';
+ 
+ export function isCloudflareEnvironment(): boolean {
+   return (
+diff --git a/src/lib/changelog.ts b/src/lib/changelog.ts
+index b704181..d95d428 100644
+--- a/src/lib/changelog.ts
++++ b/src/lib/changelog.ts
+@@ -10,6 +10,23 @@ export interface ChangelogEntry {
+ }
+ 
+ export const changelog: ChangelogEntry[] = [
++  {
++    version: "227.1.0",
++    date: "2026-11-22",
++    added: [
++    "<span style='color: #F7BA0B'>【重磅】</span>支持tvbox订阅源",
++    "增加收藏失效检测"
++    ],
++    changed: [
++    "Webtv界面美化",
++    "移除客户端去广告功能",
++    "漫画搜索界面改版，多源聚合结果显示",
++    "更换bangumi镜像地址"
++    ],
++    fixed: [
++    "修复时刻表失效"
++    ]
++  },
+   {
+     version: "227.0.1",
+     date: "2026-10-28",
+diff --git a/src/lib/config.selfcheck.test.ts b/src/lib/config.selfcheck.test.ts
+deleted file mode 100644
+index 067f2d4..0000000
+--- a/src/lib/config.selfcheck.test.ts
++++ /dev/null
+@@ -1,58 +0,0 @@
+-/**
+- * configSelfCheck 对特殊源名单的兜底：库里名单为空时从 ConfigFile 补齐。
+- * 老库升级上来没有 SpecialSourceApis 字段时，隔离会静默失效，这里守住。
+- */
+-
+-jest.mock('@/lib/db', () => ({ db: {} }));
+-
+-import { configSelfCheck } from './config';
+-import type { AdminConfig } from './admin.types';
+-
+-function makeConfig(overrides: Partial<AdminConfig>): AdminConfig {
+-  return {
+-    ConfigFile: '',
+-    SiteConfig: {} as AdminConfig['SiteConfig'],
+-    UserConfig: { Users: [] },
+-    SourceConfig: [
+-      { key: 'normal', name: '普通源', api: 'https://a.example/api' },
+-      { key: 'r18a', name: '🔞源A', api: 'https://b.example/api' },
+-      { key: 'r18b', name: '🔞源B', api: 'https://c.example/api' },
+-    ],
+-    CustomCategories: [],
+-    ...overrides,
+-  } as AdminConfig;
+-}
+-
+-const fileWithSpecial = JSON.stringify({
+-  special_source_apis: ['r18a', 'r18b', '已删除的源'],
+-});
+-
+-describe('configSelfCheck 特殊源名单兜底', () => {
+-  it('名单缺失时从 ConfigFile 补齐，并丢掉不存在的源', () => {
+-    const config = configSelfCheck(
+-      makeConfig({ ConfigFile: fileWithSpecial, SpecialSourceApis: undefined })
+-    );
+-    expect((config.SpecialSourceApis ?? []).sort()).toEqual(['r18a', 'r18b']);
+-  });
+-
+-  it('后台显式清空（空数组）时不再被配置文件回填', () => {
+-    const config = configSelfCheck(
+-      makeConfig({ ConfigFile: fileWithSpecial, SpecialSourceApis: [] })
+-    );
+-    expect(config.SpecialSourceApis).toEqual([]);
+-  });
+-
+-  it('库里已有名单时不被文件覆盖', () => {
+-    const config = configSelfCheck(
+-      makeConfig({ ConfigFile: fileWithSpecial, SpecialSourceApis: ['r18a'] })
+-    );
+-    expect(config.SpecialSourceApis).toEqual(['r18a']);
+-  });
+-
+-  it('ConfigFile 不是合法 JSON 时保持为空', () => {
+-    const config = configSelfCheck(
+-      makeConfig({ ConfigFile: '{坏掉的 json', SpecialSourceApis: [] })
+-    );
+-    expect(config.SpecialSourceApis).toEqual([]);
+-  });
+-});
+diff --git a/src/lib/d1.db.ts b/src/lib/d1.db.ts
+index 500f861..f59c297 100644
+--- a/src/lib/d1.db.ts
++++ b/src/lib/d1.db.ts
+@@ -86,9 +86,9 @@ export class D1Storage implements IStorage {
+           INSERT INTO play_records (
+             username, key, title, source_name, cover, year,
+             episode_index, total_episodes, play_time, total_time,
+-            save_time, search_title, new_episodes, is_anime, is_duanju
++            save_time, search_title, new_episodes, is_anime, is_duanju, line
+           )
+-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(username, key) DO UPDATE SET
+             title = excluded.title,
+             source_name = excluded.source_name,
+@@ -102,7 +102,8 @@ export class D1Storage implements IStorage {
+             search_title = excluded.search_title,
+             new_episodes = excluded.new_episodes,
+             is_anime = excluded.is_anime,
+-            is_duanju = COALESCE(excluded.is_duanju, play_records.is_duanju)
++            is_duanju = COALESCE(excluded.is_duanju, play_records.is_duanju),
++            line = excluded.line
+         `
+         )
+         .bind(
+@@ -121,7 +122,8 @@ export class D1Storage implements IStorage {
+           record.new_episodes || null,
+           record.is_anime ? 1 : 0,
+           // undefined = 本次不表态（不是短剧页/判断不出），别冲掉已有的标记
+-          record.is_duanju === undefined ? null : record.is_duanju ? 1 : 0
++          record.is_duanju === undefined ? null : record.is_duanju ? 1 : 0,
++          record.line || null
+         )
+         .run();
+     } catch (err) {
+@@ -275,9 +277,9 @@ export class D1Storage implements IStorage {
+           INSERT INTO favorites (
+             username, key, source_name, total_episodes, title,
+             year, cover, save_time, search_title, origin,
+-            is_completed, vod_remarks
++            is_completed, vod_remarks, is_invalid
+           )
+-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(username, key) DO UPDATE SET
+             source_name = excluded.source_name,
+             total_episodes = excluded.total_episodes,
+@@ -288,7 +290,8 @@ export class D1Storage implements IStorage {
+             search_title = excluded.search_title,
+             origin = excluded.origin,
+             is_completed = excluded.is_completed,
+-            vod_remarks = excluded.vod_remarks
++            vod_remarks = excluded.vod_remarks,
++            is_invalid = excluded.is_invalid
+         `
+         )
+         .bind(
+@@ -303,7 +306,8 @@ export class D1Storage implements IStorage {
+           favorite.search_title || '',
+           favorite.origin || null,
+           favorite.is_completed ? 1 : 0,
+-          favorite.vod_remarks || null
++          favorite.vod_remarks || null,
++          favorite.is_invalid ? 1 : 0
+         )
+         .run();
+     } catch (err) {
+@@ -1219,6 +1223,7 @@ export class D1Storage implements IStorage {
+       new_episodes: row.new_episodes || undefined,
+       is_anime: row.is_anime === 1 || row.is_anime === true,
+       is_duanju: row.is_duanju === 1 || row.is_duanju === true,
++      line: row.line || undefined,
+     };
+   }
+ 
+@@ -1233,6 +1238,7 @@ export class D1Storage implements IStorage {
+       search_title: row.search_title || '',
+       origin: row.origin as 'vod' | 'live' | undefined,
+       is_completed: row.is_completed === 1,
++      is_invalid: row.is_invalid === 1,
+       vod_remarks: row.vod_remarks || undefined,
+     };
+   }
+diff --git a/src/lib/db.client.ts b/src/lib/db.client.ts
+index 9a24c46..7930c29 100644
+--- a/src/lib/db.client.ts
++++ b/src/lib/db.client.ts
+@@ -53,6 +53,8 @@ export interface PlayRecord {
+   is_anime?: boolean;
+   /** 是否短剧（短剧竖屏页写入；普通播放页按 CMS type_name/class 判断） */
+   is_duanju?: boolean;
++  /** 线路（仅 tvbox 这类多线路源写入）：下次播放同一视频从这条线路续播 */
++  line?: string;
+ }
+ 
+ // ---- 收藏类型 ----
+@@ -66,6 +68,7 @@ export interface Favorite {
+   search_title?: string;
+   origin?: 'vod' | 'live';
+   is_completed?: boolean; // 是否已完结
++  is_invalid?: boolean; // 源站标题完全变更后失效，重新收藏时恢复
+   vod_remarks?: string; // 视频备注信息
+ }
+ 
+@@ -946,6 +949,10 @@ export async function savePlayRecord(
+   record: PlayRecord
+ ): Promise<void> {
+   const key = generateStorageKey(source, id);
++  if (source.startsWith('tvbox:') && !record.line) {
++    const previous = getCachedPlayRecordsSnapshotRaw()[key];
++    if (previous?.line) record = { ...record, line: previous.line };
++  }
+ 
+   // 数据库存储模式：乐观更新策略（包括 redis 和 upstash）
+   if (STORAGE_TYPE !== 'localstorage') {
+@@ -998,6 +1005,9 @@ export async function savePlayRecord(
+ 
+   try {
+     const allRecords = await getAllPlayRecordsRaw();
++    if (source.startsWith('tvbox:') && !record.line && allRecords[key]?.line) {
++      record = { ...record, line: allRecords[key].line };
++    }
+     allRecords[key] = record;
+     localStorage.setItem(PLAY_RECORDS_KEY, JSON.stringify(allRecords));
+     window.dispatchEvent(
+@@ -1617,6 +1627,8 @@ export async function saveFavorite(
+   favorite: Favorite
+ ): Promise<void> {
+   const key = generateStorageKey(source, id);
++  // 用户主动收藏相同来源和 ID 时，清除此前的失效状态。
++  favorite = { ...favorite, is_invalid: false };
+ 
+   // 数据库存储模式：乐观更新策略（包括 redis 和 upstash）
+   if (STORAGE_TYPE !== 'localstorage') {
+diff --git a/src/lib/emby.client.ts b/src/lib/emby.client.ts
+index 5a9b3e3..57d0583 100644
+--- a/src/lib/emby.client.ts
++++ b/src/lib/emby.client.ts
+@@ -21,6 +21,7 @@ interface EmbyConfig {
+ 
+ interface EmbyItem {
+   Id: string;
++  ParentId?: string;
+   Name: string;
+   Type: 'Movie' | 'Series' | 'Season' | 'Episode';
+   Overview?: string;
+diff --git a/src/lib/favorite-title.ts b/src/lib/favorite-title.ts
+new file mode 100644
+index 0000000..0653b62
+--- /dev/null
++++ b/src/lib/favorite-title.ts
+@@ -0,0 +1,44 @@
++const NON_TITLE_CHARACTERS = new RegExp('[^\\p{L}\\p{N}]', 'gu');
++
++function normalizeTitle(title: string): string {
++  return title
++    .normalize('NFKC')
++    .toLowerCase()
++    .replace(NON_TITLE_CHARACTERS, '');
++}
++
++/**
++ * 仅在标题明显不同的情况下判定源站复用了 ID。
++ * 忽略格式差异，允许原名附加版本说明及少量文字修正；空标题不作为失效依据。
++ */
++export function hasFavoriteTitleChanged(
++  savedTitle: string,
++  latestTitle: string
++): boolean {
++  const saved = normalizeTitle(savedTitle);
++  const latest = normalizeTitle(latestTitle);
++  if (!saved || !latest || saved.includes(latest) || latest.includes(saved)) {
++    return false;
++  }
++
++  // 编辑距离超过较长标题的一半，视为完全变更。
++  const savedChars = Array.from(saved);
++  const latestChars = Array.from(latest);
++  let previous = Array.from({ length: latestChars.length + 1 }, (_, i) => i);
++  for (let i = 0; i < savedChars.length; i++) {
++    const current = [i + 1];
++    for (let j = 0; j < latestChars.length; j++) {
++      current[j + 1] = Math.min(
++        current[j] + 1,
++        previous[j + 1] + 1,
++        previous[j] + (savedChars[i] === latestChars[j] ? 0 : 1)
++      );
++    }
++    previous = current;
++  }
++
++  return (
++    previous[latestChars.length] >
++    Math.max(savedChars.length, latestChars.length) / 2
++  );
++}
+diff --git a/src/lib/player-seek-settings.test.ts b/src/lib/player-seek-settings.test.ts
+deleted file mode 100644
+index 6d4f2ec..0000000
+--- a/src/lib/player-seek-settings.test.ts
++++ /dev/null
+@@ -1,47 +0,0 @@
+-import {
+-  calculateSeekTime,
+-  DEFAULT_QUICK_FORWARD_SECONDS,
+-  DEFAULT_SEEK_STEP_SECONDS,
+-  loadStoredSeconds,
+-  normalizeStoredSeconds,
+-  QUICK_FORWARD_STORAGE_KEY,
+-  SEEK_STEP_STORAGE_KEY,
+-} from './player-seek-settings';
+-
+-describe('播放器两个跳转时间设置', () => {
+-  beforeEach(() => localStorage.clear());
+-
+-  it('使用不同的键和默认值', () => {
+-    expect(QUICK_FORWARD_STORAGE_KEY).toBe('quickForwardSeconds');
+-    expect(SEEK_STEP_STORAGE_KEY).toBe('seekStepSeconds');
+-    expect(DEFAULT_QUICK_FORWARD_SECONDS).toBe(90);
+-    expect(DEFAULT_SEEK_STEP_SECONDS).toBe(10);
+-    expect(QUICK_FORWARD_STORAGE_KEY).not.toBe(SEEK_STEP_STORAGE_KEY);
+-  });
+-
+-  it('分别读取两个键，缺失或非法值回退到各自默认值', () => {
+-    expect(loadStoredSeconds(QUICK_FORWARD_STORAGE_KEY, 90)).toBe(90);
+-    expect(loadStoredSeconds(SEEK_STEP_STORAGE_KEY, 10)).toBe(10);
+-
+-    localStorage.setItem(QUICK_FORWARD_STORAGE_KEY, '45');
+-    localStorage.setItem(SEEK_STEP_STORAGE_KEY, 'bad');
+-
+-    expect(loadStoredSeconds(QUICK_FORWARD_STORAGE_KEY, 90)).toBe(45);
+-    expect(loadStoredSeconds(SEEK_STEP_STORAGE_KEY, 10)).toBe(10);
+-  });
+-
+-  it('只接受大于 0 的有限秒数并四舍五入', () => {
+-    expect(normalizeStoredSeconds(12.6)).toBe(13);
+-    expect(normalizeStoredSeconds(1)).toBe(1);
+-    expect(normalizeStoredSeconds(0)).toBeNull();
+-    expect(normalizeStoredSeconds(-1)).toBeNull();
+-    expect(normalizeStoredSeconds(Number.NaN)).toBeNull();
+-    expect(normalizeStoredSeconds(Number.POSITIVE_INFINITY)).toBeNull();
+-  });
+-
+-  it('按方向计算并把结果限制在视频范围内', () => {
+-    expect(calculateSeekTime(30, 100, -1, 10)).toBe(20);
+-    expect(calculateSeekTime(5, 100, -1, 10)).toBe(0);
+-    expect(calculateSeekTime(95, 100, 1, 10)).toBe(100);
+-  });
+-});
+diff --git a/src/lib/postgres.db.ts b/src/lib/postgres.db.ts
+index b7e89b2..0cabb2f 100644
+--- a/src/lib/postgres.db.ts
++++ b/src/lib/postgres.db.ts
+@@ -87,9 +87,9 @@ export class PostgresStorage implements IStorage {
+           INSERT INTO play_records (
+             username, key, title, source_name, cover, year,
+             episode_index, total_episodes, play_time, total_time,
+-            save_time, search_title, new_episodes, is_anime, is_duanju
++            save_time, search_title, new_episodes, is_anime, is_duanju, line
+           )
+-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
++          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+           ON CONFLICT (username, key) DO UPDATE SET
+             title = EXCLUDED.title,
+             source_name = EXCLUDED.source_name,
+@@ -103,7 +103,8 @@ export class PostgresStorage implements IStorage {
+             search_title = EXCLUDED.search_title,
+             new_episodes = EXCLUDED.new_episodes,
+             is_anime = EXCLUDED.is_anime,
+-            is_duanju = COALESCE(EXCLUDED.is_duanju, play_records.is_duanju)
++            is_duanju = COALESCE(EXCLUDED.is_duanju, play_records.is_duanju),
++            line = EXCLUDED.line
+         `
+         )
+         .bind(
+@@ -122,7 +123,8 @@ export class PostgresStorage implements IStorage {
+           record.new_episodes || null,
+           record.is_anime ? 1 : 0,
+           // undefined = 本次不表态（不是短剧页/判断不出），别冲掉已有的标记
+-          record.is_duanju === undefined ? null : record.is_duanju ? 1 : 0
++          record.is_duanju === undefined ? null : record.is_duanju ? 1 : 0,
++          record.line || null
+         )
+         .run();
+     } catch (err) {
+@@ -273,9 +275,9 @@ export class PostgresStorage implements IStorage {
+           INSERT INTO favorites (
+             username, key, source_name, total_episodes, title,
+             year, cover, save_time, search_title, origin,
+-            is_completed, vod_remarks
++            is_completed, vod_remarks, is_invalid
+           )
+-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
++          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           ON CONFLICT (username, key) DO UPDATE SET
+             source_name = EXCLUDED.source_name,
+             total_episodes = EXCLUDED.total_episodes,
+@@ -286,7 +288,8 @@ export class PostgresStorage implements IStorage {
+             search_title = EXCLUDED.search_title,
+             origin = EXCLUDED.origin,
+             is_completed = EXCLUDED.is_completed,
+-            vod_remarks = EXCLUDED.vod_remarks
++            vod_remarks = EXCLUDED.vod_remarks,
++            is_invalid = EXCLUDED.is_invalid
+         `
+         )
+         .bind(
+@@ -301,7 +304,8 @@ export class PostgresStorage implements IStorage {
+           favorite.search_title || '',
+           favorite.origin || null,
+           favorite.is_completed ? 1 : 0,
+-          favorite.vod_remarks || null
++          favorite.vod_remarks || null,
++          favorite.is_invalid ? 1 : 0
+         )
+         .run();
+     } catch (err) {
+@@ -375,6 +379,7 @@ export class PostgresStorage implements IStorage {
+       new_episodes: row.new_episodes || undefined,
+       is_anime: row.is_anime === 1 || row.is_anime === true,
+       is_duanju: row.is_duanju === 1 || row.is_duanju === true,
++      line: row.line || undefined,
+     };
+   }
+ 
+@@ -389,6 +394,7 @@ export class PostgresStorage implements IStorage {
+       search_title: row.search_title || '',
+       origin: row.origin as 'vod' | 'live' | undefined,
+       is_completed: row.is_completed === 1,
++      is_invalid: row.is_invalid === 1,
+       vod_remarks: row.vod_remarks || undefined,
+     };
+   }
+diff --git a/src/lib/special-source.client.test.ts b/src/lib/special-source.client.test.ts
+deleted file mode 100644
+index 75c07c6..0000000
+--- a/src/lib/special-source.client.test.ts
++++ /dev/null
+@@ -1,120 +0,0 @@
+-/**
+- * 特殊源双向隔离的核心判定。
+- * 服务端 getAvailableApiSites(user, specialOnly) 用同一口径过滤采集源，
+- * 这里覆盖客户端侧（收藏 / 播放记录 / URL 传递）的等价逻辑。
+- */
+-import {
+-  appendSpecialSourceParam,
+-  filterRecordsBySpecialSourceContext,
+-  isSpecialSourceContext,
+-  isSpecialSourceEnabledOnDevice,
+-  setSpecialSourceEnabledOnDevice,
+-  SPECIAL_SOURCE_COOKIE,
+-  SPECIAL_SOURCE_PATH,
+-} from './special-source.client';
+-
+-type WindowWithRuntimeConfig = Window & {
+-  RUNTIME_CONFIG?: { SPECIAL_SOURCE_APIS?: string[] };
+-};
+-
+-const gotoPath = (path: string) => window.history.replaceState({}, '', path);
+-
+-const setSpecialSourceApis = (apis: string[]) => {
+-  (window as WindowWithRuntimeConfig).RUNTIME_CONFIG = {
+-    SPECIAL_SOURCE_APIS: apis,
+-  };
+-};
+-
+-const RECORDS = {
+-  'r18src+1': { title: '特殊' },
+-  'normalsrc+2': { title: '普通' },
+-};
+-
+-describe('特殊源上下文判定', () => {
+-  beforeEach(() => setSpecialSourceApis(['r18src']));
+-
+-  it('/under 及其子路径算特殊源上下文', () => {
+-    expect(SPECIAL_SOURCE_PATH).toBe('/under');
+-    gotoPath('/under');
+-    expect(isSpecialSourceContext()).toBe(true);
+-    gotoPath('/under/whatever');
+-    expect(isSpecialSourceContext()).toBe(true);
+-    gotoPath('/r18');
+-    expect(isSpecialSourceContext()).toBe(false);
+-  });
+-
+-  it('普通路径不算，带 special=1 的跳转页算', () => {
+-    gotoPath('/search?q=abc');
+-    expect(isSpecialSourceContext()).toBe(false);
+-    gotoPath('/play?source=r18src&id=1&special=1');
+-    expect(isSpecialSourceContext()).toBe(true);
+-  });
+-
+-  it('appendSpecialSourceParam 只在特殊源上下文追加且不重复', () => {
+-    gotoPath('/search');
+-    expect(appendSpecialSourceParam('/play?source=a&id=1')).toBe(
+-      '/play?source=a&id=1'
+-    );
+-    gotoPath('/under');
+-    expect(appendSpecialSourceParam('/play?source=a&id=1')).toBe(
+-      '/play?source=a&id=1&special=1'
+-    );
+-    expect(appendSpecialSourceParam('/play?id=1&special=1')).toBe(
+-      '/play?id=1&special=1'
+-    );
+-  });
+-});
+-
+-describe('本机特殊源开关（cookie）', () => {
+-  beforeEach(() => setSpecialSourceEnabledOnDevice(false));
+-
+-  it('默认关闭；打开写入 cookie，关闭后清掉', () => {
+-    expect(isSpecialSourceEnabledOnDevice()).toBe(false);
+-
+-    setSpecialSourceEnabledOnDevice(true);
+-    // /under 的服务端渲染靠这个 cookie 判定，名字和值都不能变
+-    expect(document.cookie).toContain(`${SPECIAL_SOURCE_COOKIE}=1`);
+-    expect(isSpecialSourceEnabledOnDevice()).toBe(true);
+-
+-    setSpecialSourceEnabledOnDevice(false);
+-    expect(isSpecialSourceEnabledOnDevice()).toBe(false);
+-  });
+-
+-  it('和其它 cookie 共存时也能认出来', () => {
+-    document.cookie = 'auth=whatever; path=/';
+-    setSpecialSourceEnabledOnDevice(true);
+-    expect(isSpecialSourceEnabledOnDevice()).toBe(true);
+-  });
+-
+-  it('开关与入口上下文互不影响：开着开关，普通路径仍是普通入口', () => {
+-    setSpecialSourceEnabledOnDevice(true);
+-    gotoPath('/search?q=abc');
+-    expect(isSpecialSourceContext()).toBe(false);
+-  });
+-});
+-
+-describe('收藏 / 播放记录按入口隔离', () => {
+-  beforeEach(() => setSpecialSourceApis(['r18src']));
+-
+-  it('普通入口只出普通源的记录', () => {
+-    gotoPath('/');
+-    expect(Object.keys(filterRecordsBySpecialSourceContext(RECORDS))).toEqual([
+-      'normalsrc+2',
+-    ]);
+-  });
+-
+-  it('/under 只出特殊源的记录', () => {
+-    gotoPath('/under');
+-    expect(Object.keys(filterRecordsBySpecialSourceContext(RECORDS))).toEqual([
+-      'r18src+1',
+-    ]);
+-  });
+-
+-  it('没有配置特殊源时，普通入口全给、/under 为空', () => {
+-    setSpecialSourceApis([]);
+-    gotoPath('/');
+-    expect(filterRecordsBySpecialSourceContext(RECORDS)).toEqual(RECORDS);
+-    gotoPath('/under');
+-    expect(filterRecordsBySpecialSourceContext(RECORDS)).toEqual({});
+-  });
+-});
+diff --git a/src/lib/tv-detail-metadata.ts b/src/lib/tv-detail-metadata.ts
+new file mode 100644
+index 0000000..5bbb838
+--- /dev/null
++++ b/src/lib/tv-detail-metadata.ts
+@@ -0,0 +1,58 @@
++import {
++  getRecommendationCache,
++  recommendationCacheKeys,
++  setRecommendationCache,
++} from '@/lib/recommendations/cache';
++
++export type TVDetailMetadata = {
++  tmdbId: string;
++  backdrop?: string | null;
++  poster?: string | null;
++  overview?: string;
++  rating?: string;
++  releaseDate?: string;
++  genres?: { id: number; name: string }[];
++};
++
++const pendingRequests = new Map<string, Promise<TVDetailMetadata | null>>();
++
++/** 与 /play 共用 TMDB 缓存；测速更新源详情时不重复搜索影片。 */
++export async function fetchTVDetailMetadata(
++  title: string
++): Promise<TVDetailMetadata | null> {
++  const name = title.trim();
++  if (!name) return null;
++  const mappingKey = recommendationCacheKeys.tmdbTitleMapping(name);
++  const cachedId = getRecommendationCache<string>(mappingKey);
++  if (cachedId) {
++    const cached = getRecommendationCache<TVDetailMetadata>(
++      recommendationCacheKeys.tmdbDetails(cachedId)
++    );
++    if (cached) return cached;
++  }
++
++  const pending = pendingRequests.get(name);
++  if (pending) return pending;
++  const request = (async () => {
++    try {
++      const params = new URLSearchParams(
++        cachedId ? { cachedId } : { title: name }
++      );
++      const response = await fetch(`/api/tmdb-details?${params}`);
++      if (!response.ok) return null;
++      const result = (await response.json()) as TVDetailMetadata;
++      if (!result?.tmdbId) return null;
++      setRecommendationCache(mappingKey, result.tmdbId);
++      setRecommendationCache(
++        recommendationCacheKeys.tmdbDetails(result.tmdbId),
++        result
++      );
++      return result;
++    } catch {
++      // TMDB 未配置或暂不可用时，详情仍可使用采集源的海报与简介。
++      return null;
++    }
++  })().finally(() => pendingRequests.delete(name));
++  pendingRequests.set(name, request);
++  return request;
++}
+diff --git a/src/lib/tv-remote-core.ts b/src/lib/tv-remote-core.ts
+index 7f99cc7..4e12459 100644
+--- a/src/lib/tv-remote-core.ts
++++ b/src/lib/tv-remote-core.ts
+@@ -24,11 +24,31 @@ const keyConfigs: Record<
+   digit: { key: '0', code: 'Digit0', keyCode: 48 },
+ };
+ 
+-function dispatchKeyboardEvent(type: 'keydown' | 'keyup', cfg: {
+-  key: string;
+-  code: string;
+-  keyCode: number;
+-}, repeat = false) {
++export function isTVRemoteMenuKey(
++  event: Pick<KeyboardEvent, 'key' | 'code' | 'keyCode' | 'which'>
++) {
++  return (
++    event.key === 'ContextMenu' ||
++    event.key === 'Menu' ||
++    event.key === 'BrowserContextMenu' ||
++    event.code === 'ContextMenu' ||
++    event.code === 'Menu' ||
++    event.keyCode === 93 ||
++    event.keyCode === 82 ||
++    event.which === 93 ||
++    event.which === 82
++  );
++}
++
++function dispatchKeyboardEvent(
++  type: 'keydown' | 'keyup',
++  cfg: {
++    key: string;
++    code: string;
++    keyCode: number;
++  },
++  repeat = false
++) {
+   const event = new KeyboardEvent(type, {
+     key: cfg.key,
+     code: cfg.code,
+@@ -45,11 +65,12 @@ function dispatchKeyboardEvent(type: 'keydown' | 'keyup', cfg: {
+   document.dispatchEvent(event);
+ }
+ 
+-export function fireTVRemoteKey(command: TVRemoteKey | TVRemoteKeyCommand, repeat = false) {
++export function fireTVRemoteKey(
++  command: TVRemoteKey | TVRemoteKeyCommand,
++  repeat = false
++) {
+   const normalized =
+-    typeof command === 'string'
+-      ? { key: command, repeat }
+-      : command;
++    typeof command === 'string' ? { key: command, repeat } : command;
+   let cfg = keyConfigs[normalized.key];
+ 
+   if (normalized.key === 'digit') {
+@@ -67,7 +88,10 @@ export function fireTVRemoteKey(command: TVRemoteKey | TVRemoteKeyCommand, repea
+   dispatchKeyboardEvent('keyup', cfg, Boolean(normalized.repeat));
+ }
+ 
+-function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
++function setNativeValue(
++  element: HTMLInputElement | HTMLTextAreaElement,
++  value: string
++) {
+   const prototype = Object.getPrototypeOf(element);
+   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+   descriptor?.set?.call(element, value);
+@@ -75,7 +99,10 @@ function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value:
+ 
+ function getTextTarget() {
+   const active = document.activeElement;
+-  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
++  if (
++    active instanceof HTMLInputElement ||
++    active instanceof HTMLTextAreaElement
++  ) {
+     return active;
+   }
+ 
+diff --git a/src/lib/utils.ts b/src/lib/utils.ts
+index 1e2fe66..16b57b2 100644
+--- a/src/lib/utils.ts
++++ b/src/lib/utils.ts
+@@ -137,21 +137,17 @@ function isBangumiImageUrl(url: string): boolean {
+     return (
+       hostname === 'lain.bgm.tv' ||
+       hostname === 'r.bgm.tv' ||
+-      hostname === 'bangumi.lol' ||
++      hostname === 'bgm.lat' ||
+       hostname.endsWith('.bgm.tv') ||
+       hostname.endsWith('.bangumi.tv') ||
+-      hostname.endsWith('.bangumi.lol')
++      hostname.endsWith('.bgm.lat')
+     );
+   } catch {
+     return false;
+   }
+ }
+ 
+-type AnimeImageSource =
+-  | 'direct'
+-  | 'server-proxy'
+-  | 'custom-baseurl'
+-  | 'sakura';
++type AnimeImageSource = 'direct' | 'server-proxy' | 'custom-baseurl' | 'sakura';
+ 
+ const BANGUMI_IMAGE_FALLBACK_UNTIL_KEY = 'bangumiImageFallbackUntil';
+ const BANGUMI_IMAGE_FALLBACK_SIGNATURE_KEY = 'bangumiImageFallbackSignature';
+@@ -179,17 +175,20 @@ function normalizeBaseUrl(baseUrl: string): string {
+   return baseUrl.trim().replace(/\/+$/, '');
+ }
+ 
+-/** 官方域名 → 桜色镜像站（bgm.tv → bangumi.lol 等） */
++/** 官方域名 → 镜像站（bgm.tv → bgm.lat 等） */
+ function rewriteBangumiUrlToSakura(url: string): string {
+   try {
+     const parsed = new URL(url);
+     const hostname = parsed.hostname.toLowerCase();
+     if (hostname === 'bgm.tv' || hostname === 'bangumi.tv') {
+-      parsed.hostname = 'bangumi.lol';
++      parsed.hostname = 'bgm.lat';
+     } else if (hostname.endsWith('.bgm.tv')) {
+-      parsed.hostname = `${hostname.slice(0, -'.bgm.tv'.length)}.bangumi.lol`;
++      parsed.hostname = `${hostname.slice(0, -'.bgm.tv'.length)}.bgm.lat`;
+     } else if (hostname.endsWith('.bangumi.tv')) {
+-      parsed.hostname = `${hostname.slice(0, -'.bangumi.tv'.length)}.bangumi.lol`;
++      parsed.hostname = `${hostname.slice(
++        0,
++        -'.bangumi.tv'.length
++      )}.bgm.lat`;
+     }
+     return parsed.toString();
+   } catch {
+@@ -268,7 +267,7 @@ function getBangumiImageProbeOrigin(): string | null {
+     case 'server-proxy':
+       return null;
+     case 'sakura':
+-      return 'https://lain.bangumi.lol';
++      return 'https://lain.bgm.lat';
+     case 'custom-baseurl': {
+       const base = getBangumiImageBaseUrl();
+       if (!base) return 'https://lain.bgm.tv';
+@@ -588,9 +587,7 @@ export function processImageUrl(originalUrl: string): string {
+           'http://image.tmdb.org',
+         ]) {
+           if (originalUrl.startsWith(officialBase)) {
+-            return (
+-              tmdbImageBaseUrl + originalUrl.slice(officialBase.length)
+-            );
++            return tmdbImageBaseUrl + originalUrl.slice(officialBase.length);
+           }
+         }
+       }
+@@ -706,7 +703,8 @@ export class SpeedTestError extends Error {
+  */
+ export async function getVideoResolutionFromM3u8(
+   m3u8Url: string,
+-  timeoutMs = 6000
++  timeoutMs = 6000,
++  signal?: AbortSignal
+ ): Promise<{
+   quality: string; // 如720p、1080p等
+   loadSpeed: string; // 自动转换为KB/s或MB/s
+@@ -714,7 +712,8 @@ export async function getVideoResolutionFromM3u8(
+   bitrate: string; // 视频码率（如 "2.5 Mbps"）
+ }> {
+   try {
+-    const { default: Hls } = await import('hls.js');
++    const { default: Hls, FetchLoader } = await import('hls.js');
++    if (signal?.aborted) throw new DOMException('测速已取消', 'AbortError');
+ 
+     // 直接使用m3u8 URL作为视频源，避免CORS问题
+     return new Promise((resolve, reject) => {
+@@ -725,9 +724,15 @@ export async function getVideoResolutionFromM3u8(
+       // 测量网络延迟（ping时间） - 使用m3u8 URL而不是ts文件
+       const pingStart = performance.now();
+       let pingTime = 0;
++      const pingController = new AbortController();
+ 
+       // 测量ping时间（使用m3u8 URL）
+-      fetch(m3u8Url, { method: 'HEAD', mode: 'no-cors' })
++      fetch(m3u8Url, {
++        method: 'HEAD',
++        mode: 'no-cors',
++        cache: 'no-store',
++        signal: pingController.signal,
++      })
+         .then(() => {
+           pingTime = performance.now() - pingStart;
+         })
+@@ -735,16 +740,37 @@ export async function getVideoResolutionFromM3u8(
+           pingTime = performance.now() - pingStart; // 记录到失败为止的时间
+         });
+ 
+-      // 固定使用hls.js加载
+-      const hls = new Hls();
++      // 绕过浏览器缓存，不改写分片 URL，避免破坏 TVBox / 网盘地址的签名。
++      const hls = new Hls({
++        loader: FetchLoader,
++        fetchSetup: (context, initParams) =>
++          new Request(context.url, { ...initParams, cache: 'no-store' }),
++      });
+ 
+       let actualLoadSpeed = '未知';
+       let hasSpeedCalculated = false;
+       let hasMetadataLoaded = false;
+       let estimatedBitrate = 0; // 估算的码率（bps）
++      let settled = false;
++      let samplingTimeout: ReturnType<typeof setTimeout> | undefined;
++      const cleanup = () => {
++        settled = true;
++        clearTimeout(timeout);
++        clearTimeout(samplingTimeout);
++        signal?.removeEventListener('abort', onAbort);
++        pingController.abort();
++        hls.destroy();
++        video.remove();
++      };
++      const onAbort = () => {
++        if (settled) return;
++        cleanup();
++        reject(new DOMException('测速已取消', 'AbortError'));
++      };
+ 
+       // 提取核心返回逻辑供 resolve 和 timeout 共同调用
+       const resolveCurrentState = () => {
++        if (settled) return;
+         const width = video.videoWidth;
+         const quality =
+           width >= 3840
+@@ -768,8 +794,7 @@ export async function getVideoResolutionFromM3u8(
+               : `${Math.round(estimatedBitrate / 1000)} Kbps`
+             : '未知';
+ 
+-        hls.destroy();
+-        video.remove();
++        cleanup();
+ 
+         resolve({
+           quality,
+@@ -784,24 +809,29 @@ export async function getVideoResolutionFromM3u8(
+         if (hasMetadataLoaded || hasSpeedCalculated) {
+           resolveCurrentState();
+         } else {
+-          hls.destroy();
+-          video.remove();
++          cleanup();
+           reject(
+             new SpeedTestError('timeout', 'Timeout loading video metadata')
+           );
+         }
+       }, timeoutMs);
++      signal?.addEventListener('abort', onAbort, { once: true });
+ 
+       video.onerror = () => {
+-        clearTimeout(timeout);
+-        hls.destroy();
+-        video.remove();
++        if (settled) return;
++        const mediaError = video.error;
++        cleanup();
+         reject(
+-          new SpeedTestError('unreachable', 'Failed to load video metadata')
++          new SpeedTestError(
++            'unreachable',
++            `视频元数据加载失败：code=${mediaError?.code || 0} ${mediaError?.message || ''}`
++          )
+         );
+       };
+ 
+-      let fragmentStartTime = 0;
++      let sampledBytes = 0;
++      let sampledLoadTime = 0;
++      let samplingWindowElapsed = false;
+ 
+       // 检查是否可以相互满足要求
+       const checkAndResolve = () => {
+@@ -814,75 +844,85 @@ export async function getVideoResolutionFromM3u8(
+         }
+       };
+ 
+-      // 监听片段加载开始
+-      hls.on(Hls.Events.FRAG_LOADING, () => {
+-        fragmentStartTime = performance.now();
+-      });
++      const updateSampledSpeed = () => {
++        if (settled || hasSpeedCalculated) return;
++        // 快线路可能在 1 秒内填满缓冲，之后不再下载分片。
++        // 采样窗口按墙钟结束，速度仍按实际传输耗时计算，避免空等整个超时。
++        if (
++          (!samplingWindowElapsed && sampledLoadTime < 1000) ||
++          sampledBytes < 256 * 1024 ||
++          sampledLoadTime <= 0
++        )
++          return;
++
++        const speedKBps = sampledBytes / 1024 / (sampledLoadTime / 1000);
++        actualLoadSpeed =
++          speedKBps >= 1024
++            ? `${(speedKBps / 1024).toFixed(1)} MB/s`
++            : `${speedKBps.toFixed(1)} KB/s`;
++        hasSpeedCalculated = true;
++        checkAndResolve();
++      };
+ 
+-      // 监听片段加载完成，只需首个分片即可计算速度
+-      hls.on(Hls.Events.FRAG_LOADED, (event: any, data: any) => {
++      // 使用各视频分片自己的传输时间，忽略初始化分片和独立音轨。
++      hls.on(Hls.Events.FRAG_LOADED, (_event, data) => {
+         if (
+-          fragmentStartTime > 0 &&
+-          data &&
+-          data.payload &&
+-          !hasSpeedCalculated
+-        ) {
+-          const loadTime = performance.now() - fragmentStartTime;
+-          const size = data.payload.byteLength || 0;
+-
+-          if (loadTime > 0 && size > 0) {
+-            const speedKBps = size / 1024 / (loadTime / 1000);
+-
+-            // 立即计算速度，无需等待更多分片
+-            const avgSpeedKBps = speedKBps;
+-
+-            if (avgSpeedKBps >= 1024) {
+-              actualLoadSpeed = `${(avgSpeedKBps / 1024).toFixed(1)} MB/s`;
+-            } else {
+-              actualLoadSpeed = `${avgSpeedKBps.toFixed(1)} KB/s`;
+-            }
+-            hasSpeedCalculated = true;
+-
+-            // 从分片估算码率
+-            if (data.frag && data.frag.duration > 0) {
+-              const fragmentDuration = data.frag.duration; // 分片时长（秒）
+-              const fragmentSize = size; // 分片大小（字节）
+-
+-              // 码率 = (分片大小 × 8 bits) / 分片时长
+-              estimatedBitrate = Math.round(
+-                (fragmentSize * 8) / fragmentDuration
+-              );
+-
+-              console.log(
+-                `[测速] 估算码率: ${(estimatedBitrate / 1000000).toFixed(
+-                  2
+-                )} Mbps (分片: ${(fragmentSize / 1024 / 1024).toFixed(
+-                  2
+-                )} MB, 时长: ${fragmentDuration.toFixed(1)}s)`
+-              );
+-            }
+-
+-            checkAndResolve(); // 尝试返回结果
+-          }
++          settled ||
++          hasSpeedCalculated ||
++          data.frag.type !== 'main' ||
++          data.frag.sn === 'initSegment'
++        )
++          return;
++
++        const size = data.payload.byteLength;
++        const { start, end } = (data.part?.stats || data.frag.stats).loading;
++        const loadTime = end - start;
++        if (size <= 0 || loadTime <= 0) return;
++
++        const fragmentDuration = data.part?.duration || data.frag.duration;
++        if (fragmentDuration > 0) {
++          estimatedBitrate = Math.round((size * 8) / fragmentDuration);
+         }
+-      });
+ 
+-      // 为分片请求添加时间戳参数破除浏览器缓存
+-      hls.config.xhrSetup = function (xhr: XMLHttpRequest, url: string) {
+-        const urlWithTimestamp = url.includes('?')
+-          ? `${url}&_t=${Date.now()}`
+-          : `${url}?_t=${Date.now()}`;
+-        xhr.open('GET', urlWithTimestamp, true);
+-      };
+-
+-      hls.loadSource(m3u8Url);
+-      hls.attachMedia(video);
++        // 跨域无 Timing-Allow-Origin 时传输大小为 0，不能据此误判缓存。
++        const fromCache = performance
++          .getEntriesByName(data.part?.url || data.frag.url, 'resource')
++          .some((entry) => {
++            const resource = entry as PerformanceResourceTiming;
++            return (
++              resource.startTime >= start &&
++              resource.startTime <= end &&
++              resource.transferSize === 0 &&
++              resource.decodedBodySize > 0
++            );
++          });
++        if (fromCache) return;
++
++        sampledBytes += size;
++        sampledLoadTime += loadTime;
++        if (samplingTimeout === undefined) {
++          samplingTimeout = setTimeout(() => {
++            samplingWindowElapsed = true;
++            updateSampledSpeed();
++          }, 1000);
++        }
++        updateSampledSpeed();
++      });
+ 
+       // 监听hls.js错误
+       hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+-        console.error('HLS错误:', data);
++        if (settled) return;
++        const statusCode = data.response?.code || data.response?.status;
++        const details = typeof data.details === 'string' ? data.details : '';
++        const cause = data.error instanceof Error ? data.error.message : '';
++        console.error(`[线路优选] HLS错误 ${JSON.stringify({
++          type: data.type,
++          details,
++          fatal: data.fatal,
++          status: statusCode,
++          error: cause,
++        })}`);
+         if (data.fatal) {
+-          const statusCode = data.response?.code || data.response?.status;
+           // 防止 415 代理兜底熔断导致正常的二进制源在优选逻辑中被剔除
+           if (
+             statusCode === 415 &&
+@@ -892,9 +932,7 @@ export async function getVideoResolutionFromM3u8(
+             console.log(
+               '[测速] 测速通道嗅探到这是底层的媒体流文件，免测速通过'
+             );
+-            clearTimeout(timeout);
+-            hls.destroy();
+-            video.remove();
++            cleanup();
+             resolve({
+               quality: '原生画质',
+               loadSpeed: '直连',
+@@ -904,18 +942,14 @@ export async function getVideoResolutionFromM3u8(
+             return;
+           }
+ 
+-          clearTimeout(timeout);
+-          hls.destroy();
+-          video.remove();
++          cleanup();
+           // HLS 的 *TimeOut 类 details（manifestLoadTimeOut 等）归为超时，
+           // 其余致命错误（网络不可达、404、解析失败）归为无法访问
+-          const details =
+-            typeof data.details === 'string' ? data.details : '';
+           const isTimeout = details.toLowerCase().includes('timeout');
+           reject(
+             new SpeedTestError(
+               isTimeout ? 'timeout' : 'unreachable',
+-              `HLS播放失败: ${data.type}`
++              `HLS测速失败：${data.type}/${details}${statusCode ? ` HTTP ${statusCode}` : ''}${cause ? ` ${cause}` : ''}`
+             )
+           );
+         }
+@@ -926,8 +960,17 @@ export async function getVideoResolutionFromM3u8(
+         hasMetadataLoaded = true;
+         checkAndResolve(); // 尝试返回结果
+       };
++      // 先绑定错误和元数据事件，再开始加载，避免同步报错被漏掉。
++      hls.loadSource(m3u8Url);
++      hls.attachMedia(video);
+     });
+   } catch (error) {
++    if (
++      error instanceof SpeedTestError ||
++      (error instanceof Error && error.name === 'AbortError')
++    ) {
++      throw error;
++    }
+     throw new Error(
+       `Error getting video resolution: ${
+         error instanceof Error ? error.message : String(error)
