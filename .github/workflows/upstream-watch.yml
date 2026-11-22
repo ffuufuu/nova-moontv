@@ -1,0 +1,97 @@
+name: Upstream Watch
+
+# 每天看一眼上游 mtvpls/MoonTVPlus 有没有发新版。
+# 有更新 → 生成增量补丁并尝试三方合并：
+#   干净：推一个 auto/upstream-<sha> 分支 + 开 PR（不碰 main）
+#   有冲突：什么都不改，开 issue 列出冲突文件和处理步骤
+# 详细说明见 sync/README.md
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # UTC 18:00 = 北京时间 02:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: 检测上游更新
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: 检测上游 sha
+        id: detect
+        run: |
+          set -e
+          git remote add upstream https://github.com/mtvpls/MoonTVPlus.git 2>/dev/null || true
+          git fetch upstream main --force --quiet
+          NEW=$(git rev-parse upstream/main)
+          OLD=$(python3 -c "import json;print(json.load(open('sync/upstream-state.json'))['sha'])")
+          echo "old=$OLD"
+          echo "new=$NEW"
+          if [ "$OLD" = "$NEW" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "old=$OLD" >> "$GITHUB_OUTPUT"
+            echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 生成补丁并尝试合并
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          bash sync/upstream-sync.sh \
+            --old "${{ steps.detect.outputs.old }}" \
+            --new "${{ steps.detect.outputs.new }}" \
+            --apply
+
+      - name: 干净合并 → 推分支 + 开 PR
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          CLEAN=$(python3 -c "import json;print(json.load(open('sync/reports/last-result.json')).get('clean'))")
+          SHA=$(python3 -c "import json;print(json.load(open('sync/reports/last-result.json')).get('upstream_sha',''))")
+          SHORT=${SHA:0:7}
+          REPORT=$(ls -t sync/reports/upstream-*.md | head -1)
+          if [ "$CLEAN" = "True" ]; then
+            git push -f origin "HEAD:refs/heads/auto/upstream-$SHORT"
+            gh pr create \
+              --base main \
+              --head "auto/upstream-$SHORT" \
+              --title "上游同步：$SHORT（自动合并，待人工确认）" \
+              --body-file "$REPORT" || echo "PR 可能已存在，跳过创建"
+          else
+            TITLE="上游有更新但需人工解冲突：$SHORT"
+            EXISTS=$(gh issue list --state open --search "$SHORT in:title" --json number --jq 'length')
+            if [ "$EXISTS" = "0" ]; then
+              gh issue create --title "$TITLE" --body-file "$REPORT" || echo "开 issue 失败，请看 Actions 日志"
+            else
+              echo "已有同 sha 的 issue，跳过"
+            fi
+          fi
+
+      - name: 汇总
+        if: always()
+        run: |
+          echo "### 上游检测结果" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.detect.outputs.changed }}" = "true" ]; then
+            echo "- 上游有新版本：\`${{ steps.detect.outputs.new }}\`" >> $GITHUB_STEP_SUMMARY
+            cat sync/reports/last-result.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            cat "$(ls -t sync/reports/upstream-*.md 2>/dev/null | head -1)" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+          else
+            echo "- 上游无更新（\`${{ steps.detect.outputs.old || 'unknown' }}\`）" >> $GITHUB_STEP_SUMMARY
+          fi

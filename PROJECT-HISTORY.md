@@ -88,6 +88,18 @@
 - 版本号正式回到站内显示（右下角用户菜单 `v1.3.0`）；
 - 关停测试站（3001），只保留正式站一条线；内存占用 690MB → 581MB。
 
+### 2026-11-22 · 上游更新同步机制（工具链）
+
+上游每次发版把 `main` 重写成一个 squash 提交（当前 `8a1137b v227.0.1`），没有可 cherry-pick 的逐条历史；我们与上游已差 118 个文件、−23000 行。于是做了「快照差分 + 三方合并 + 品牌重刷」的自动化：
+
+- `sync/upstream-state.json` 记住上次同步到的上游 sha；
+- `.github/workflows/upstream-watch.yml` 每天北京时间 02:00 检测，sha 变了就生成增量补丁并尝试合并；
+- `sync/sync-paths.conf` 白名单：只吃 `src/lib`、`src/app/api`、`src/app/play`、`src/app/admin`，UI 外壳与被删模块永远不进；
+- 干净合并 → 推 `auto/upstream-<sha>` 分支 + 开 PR；有冲突 → 开 issue 列冲突，整体回滚，**永不自动动 main**；
+- 合并后 `sync/restamp.sh` 把版本号与品牌文件强制还原成我们的。
+
+这一步不改运行代码，因此不占版本号（详见 `sync/README.md`）。
+
 ---
 
 ## 三、版本记录

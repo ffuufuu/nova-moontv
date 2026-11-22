@@ -3,6 +3,13 @@ name: Build & Push Image
 on:
   push:
     branches: [main]
+    # 纯文档 / 同步工具链 / workflow 自身的改动不触发镜像构建，省 CI 时间
+    paths-ignore:
+      - '**/*.md'
+      - 'sync/**'
+      - '.github/**'
+      - 'LICENSE'
+      - '.gitignore'
   workflow_dispatch:
 
 jobs:
