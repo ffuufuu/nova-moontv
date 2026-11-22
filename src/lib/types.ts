@@ -39,6 +39,8 @@ export interface Favorite {
   origin?: 'vod' | 'live';
   is_completed?: boolean; // 是否已完结
   vod_remarks?: string; // 视频备注信息
+  /** 源站标题完全变更后置为失效（收藏失效检测用） */
+  is_invalid?: boolean;
 }
 
 // 存储接口
