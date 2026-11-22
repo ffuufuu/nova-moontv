@@ -1,7 +1,7 @@
 {
   "upstream": "https://github.com/mtvpls/MoonTVPlus",
-  "sha": "8a1137b56cd0acc0ddf1f1cc7009e6f80a8efc24",
-  "version": "v227.0.1",
+  "sha": "a72637296b7f8469eab9818cf3c30327dc75f38d",
+  "version": "v227.1.0",
   "synced_at": "2026-11-22",
   "note": "上游 main 每次发版 squash 成一个提交；sha 变了就说明有新版本。"
 }

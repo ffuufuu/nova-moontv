@@ -157,6 +157,25 @@ v1.5.1 的改法（`src/app/play/page.tsx`）：
 
 做 v1.5.1 时检查报告发现上游动了：`a726372 / v227.1.0`，相对基线 `8a1137b / v227.0.1` 有 **20 个提交**，是本项目自建同步机制以来**第一次真遇到上游更新**。面板会显示「未同步」，等 02:00 的 Upstream Watch 或手动跑 `sync/upstream-sync.sh` 生成增量补丁后再决定吃哪些。
 
+### 2026-11-22 · v1.6.0：把上游 v227.1.0 真正吃进来
+
+**同步工具先升到 v2**（`373bf58`，只动 `sync/**`，不触发构建）。v1 的「整包补丁 + `git apply -3`」实测根本跑不通：
+- 补丁含 73 个文件、+6373/−1623，其中 `play/page.tsx`、`admin/page.tsx`、`search/route.ts`、`image-proxy/route.ts`、`types.ts`、`config.ts` 都是我们重写过的 → 必冲突；
+- 有 24 个文件我们树里根本没有（已删模块 / 上游新增）→ `does not exist in index`，整包直接失败。
+
+v2 的做法：
+- `sync/sync-paths.conf` 加 34 条 `:!` 排除（六模块、tvbox-bridge 全家、manga/ai/emby/openlist、login/register、`admin/page.tsx` 等）；
+- 新增 `sync/split_patch.py` 三分类：命中排除 → skip；我们删过 → skip；我们改过 → manual；其余 → auto 候选（上游新增文件先进候选），再做**依赖闭环**——以**上游新版本内容**为准，反复剔除 `@/` 与相对引用在 tree 和候选集里都找不到的文件，降级 manual 并写明原因；
+- 产出三份补丁（全量 / `.auto` / `.manual`），`--apply` 只合 auto、`--apply-all` 连 manual，合完自动 `restamp`；报告分「可机器合 / 必须人工 / 跳过」三节。
+
+**首次实战结果**：auto **20** / manual **20** / skip 0，断链 0，合入 +406/−385。auto 里有价值的是 `lib/utils.ts` 241 行重构、`bangumi*` 四件、`d1.db`/`postgres.db`/`db.client`、`favorites`、`playrecords`、`tvbox/config`，以及上游新增的 `favorite-title.ts`、`tv-detail-metadata.ts`、`tv-search.ts`、`tv-remote-core.ts`（对应本版头条「支持 tvbox 订阅源」和「收藏失效检测」）。
+
+**CI 连挂两次**（`26052e7` #79 3m42s 失败、`ba66725` #80 3m19s 失败）。第一次日志能看出 `record.line` 不在 `PlayRecord` 上；补完 `line`/`is_invalid` 后第二次只给 buildx 泛化错误，Actions 日志面板是虚拟化的，拿不到具体 TS 报错。
+**换打法**：服务器 `git archive HEAD` → 本地 `/tmp/build` → `pnpm install`（57s）→ `npx tsc --noEmit`，一眼看到真实错误——`Favorite` 缺 `is_invalid`（`d1.db.ts` / `postgres.db.ts` 各两处）。补上后再本地 `next build` 全量验证通过。提交 `3e723b5` → 构建 **#81 成功（8m18s）** → 镜像 `010c335167b1` → `compose up -d --force-recreate` 上线。
+
+**验收**（登录态）：`/` 200、`/admin` 200、`/api/tvbox/config` 200（`enabled:true`、订阅地址带 token）、`/api/favorites` 200、`/api/playrecords` 200、`/api/search?q=三体` 200、`/api/detail?source=iqiyizyapi.com&id=87003` 200 且有集数、`/play` 200。
+版本面板数据也修了：`ourVersion` 由宿主 `check.py` 读 `src/lib/version.ts`（原报告是旧值 1.5.1，重跑即 1.6.0）；同时把 `sync/upstream-state.json` restamp 到 `a726372 / v227.1.0`，并把 `check.py` 的基线优先级改成 **state.json 优先**（原来会被 `/opt/upstream-check/base*.txt` 强覆盖，导致合完还显示「未同步」）。
+
 ---
 
 ## 三、版本记录
@@ -170,6 +189,7 @@ v1.5.1 的改法（`src/app/play/page.tsx`）：
 | v1.4.0 | 2026-11-22 | `46f62db` | #76（12m32s） | 版本面板接上同步流水线（真版本号、真基线、增量统计、自动检测入口） |
 | v1.5.0 | 2026-11-22 | `625c178` | #77（11m37s） | 图片代理本地磁盘缓存（30 天 / 800MB LRU）+ 系统瘦身（废镜像、fwupd/multipathd、apt 内存上限） |
 | v1.5.1 | 2026-11-22 | `3439376` | #78（11m59s） | 播放页指定源详情失败时自动切源 + 错误页显示真实原因 |
+| v1.6.0 | 2026-11-22 | `3e723b5` | #81（8m18s） | 吸收上游 v227.1.0 的 20 个自动增量（收藏失效检测 / 番剧数据 / 工具库重构 / TVBox 订阅相关）+ 同步工具 v2 |
 
 ---
 
@@ -211,6 +231,10 @@ v1.5.1 的改法（`src/app/play/page.tsx`）：
 5. **测试站 kvrocks 用户数据不能 `GET`+`SET` 复制**：`user:*` 是 hash，必须 `DUMP`/`RESTORE`，否则登录报 `WRONGTYPE`。
 6. **手机端 iframe 内嵌后台**：桌面模拟通过不代表真机能滚，三次都栽在这里，已封存。
 7. **豆瓣 `81.70.124.99:443` 会偶发 ConnectTimeout**：首页 Hero 空白的根因，已用 4s 超时 + 兜底解决。
+8. **Actions 构建失败的具体 TS 报错在页面里拿不到**：日志面板虚拟化，annotation 只给 buildx 的 `exit code: 1`。**唯一可靠打法**是 `git archive HEAD` 拿回本地，`pnpm install --frozen-lockfile --ignore-scripts` + `npx tsc --noEmit`，再 `next build` 全量验证；别在页面上反复猜。
+9. **上游合并后 `sync/*` 必须先提交再跑脚本**：`git reset --hard` 会把 sftp 上传未提交的 `sync/*` 一起回滚，导致脚本“莫名其妙变回旧版”。
+10. **基线有两份来源会打架**：`check.py` 原先被 `/opt/upstream-check/base.txt`、`base-version.txt` 强覆盖；现在已改为 `sync/upstream-state.json` 优先，两个 txt 只做兜底。合并后记得同步 state.json。
+11. **`package.json` 的 version 还没跟上 1.6.0**（仍是 1.5.1，`version.ts`/`VERSION.txt` 已是 1.6.0）。因为改它就会触发一次构建，先留到下一次真实改动一起推，别单独为它跑一次 CI。
 
 ---
 
@@ -228,6 +252,7 @@ v1.5.1 的改法（`src/app/play/page.tsx`）：
 
 - **A1 登录限流**：登录接口无失败计数/封禁，`chen` 仍是弱口令，暴露在公网 —— 最该做，半小时能完；
 - **A2 备份演练 + 异地**：已有每日自动备份（`/opt/moontv-backup.sh` 每天 04:30 打包 kvrocks 卷到 `/opt/backup/moontv`），但**没验证过恢复流程**，也没有异地副本，机器挂了备份一起没。
+- **上游本次 20 个 manual 文件还没吃**：`play/page.tsx`（+925/−109）、`admin/page.tsx`（+231/−326）、`search/ws/route.ts`（+100/−2）、`source-detail`（+58/−96）、`tvbox/subscribe`（+100/−89）、`types.ts`（+23）等。本版红利是 TVBox 订阅源，但 tvbox-bridge 家族被我们整体排除，要不要引入需要拍板；`play/page.tsx` 是我们重写过的（v1.5.1 自动切源），**不建议盲目合并**。
 
 ### 8.2 候选清单（2026-11-22 与用户过过一遍，用户说「先这样」，都还没动）
 

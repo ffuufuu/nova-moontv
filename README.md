@@ -6,7 +6,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.5.0-2ea043)
+![Version](https://img.shields.io/badge/version-1.6.0-2ea043)
 ![Next.js](https://img.shields.io/badge/Next.js-14-000?logo=nextdotjs)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3-38bdf8?logo=tailwindcss)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)
@@ -45,7 +45,7 @@
 - **TVBox 订阅**：`/api/tvbox` 输出订阅配置（token 保护）
 - **注册体系**：邀请码、扫码登录、OIDC
 - **后台管理**：站点配置、视频源配置、用户管理、播放与体验默认值
-- **版本面板**：右下角用户菜单显示 `v1.5.0`；面板内含「上游更新看板」（我方版本 / 基于上游 / 上游最新 / 该版增量统计 / 自动检测跳转）
+- **版本面板**：右下角用户菜单显示 `v1.6.0`；面板内含「上游更新看板」（我方版本 / 基于上游 / 上游最新 / 该版增量统计 / 自动检测跳转）
 
 ## 性能与稳定性（相对上游的实质改动）
 
