@@ -35,6 +35,21 @@ interface UpstreamReport {
   upToDate: boolean;
   commits: UpstreamCommit[];
   summary: { total: number; safe: number; manual: number; skip: number };
+  sync?: {
+    auto: boolean;
+    cadence: string;
+    workflowUrl: string;
+    prUrl: string;
+    issueUrl: string;
+    lastSyncAt: string;
+    lastSyncCommit: string;
+    patch?: {
+      available: boolean;
+      files: number;
+      highRisk: number;
+      safe: number;
+    };
+  };
 }
 
 const RISK_META: Record<
@@ -251,6 +266,66 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
                 </div>
               )}
 
+              {/* 自动同步 */}
+              {report.sync && (
+                <div className='rounded-lg border border-neutral-200 dark:border-neutral-800 p-3 sm:p-4 space-y-2 text-sm'>
+                  <div className='flex items-center justify-between gap-3'>
+                    <span className='text-neutral-500'>自动同步</span>
+                    <span className='text-[11px] text-neutral-500'>
+                      {report.sync.cadence}
+                    </span>
+                  </div>
+                  <div className='flex items-center justify-between gap-3'>
+                    <span className='text-neutral-500'>最近同步</span>
+                    <span className='font-mono text-neutral-900 dark:text-neutral-100'>
+                      {report.sync.lastSyncCommit}
+                      {report.sync.lastSyncAt ? (
+                        <span className='ml-1.5 text-[11px] text-neutral-400'>
+                          {report.sync.lastSyncAt}
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
+                  <div className='flex items-center justify-between gap-3'>
+                    <span className='text-neutral-500'>该版增量</span>
+                    <span className='text-[11px] text-neutral-500'>
+                      {report.sync.patch && report.sync.patch.available
+                        ? `共 ${report.sync.patch.files} 文件 · 高危 ${report.sync.patch.highRisk} · 可摘 ${report.sync.patch.safe}`
+                        : '尚未生成补丁'}
+                    </span>
+                  </div>
+                  <div className='flex flex-wrap gap-2 pt-1'>
+                    <a
+                      href={report.sync.workflowUrl}
+                      target='_blank'
+                      rel='noreferrer'
+                      className='rounded-md border border-neutral-200 dark:border-neutral-800 px-2.5 py-1.5 text-[11px] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition-colors'
+                    >
+                      检测记录
+                    </a>
+                    <a
+                      href={report.sync.prUrl}
+                      target='_blank'
+                      rel='noreferrer'
+                      className='rounded-md border border-neutral-200 dark:border-neutral-800 px-2.5 py-1.5 text-[11px] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition-colors'
+                    >
+                      待合并 PR
+                    </a>
+                    <a
+                      href={report.sync.issueUrl}
+                      target='_blank'
+                      rel='noreferrer'
+                      className='rounded-md border border-neutral-200 dark:border-neutral-800 px-2.5 py-1.5 text-[11px] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition-colors'
+                    >
+                      冲突 issue
+                    </a>
+                  </div>
+                  <p className='text-[11px] text-neutral-400 leading-relaxed'>
+                    流程：检测上游 → 只摘后端/接口增量 → 干净合并开 PR，冲突开 issue；合并后按规则升版本号才算新版本。
+                  </p>
+                </div>
+              )}
+
               {/* 提交列表 */}
               {report.commits.length > 0 && (
                 <div className='space-y-2'>
@@ -322,7 +397,7 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
               )}
 
               <p className='text-[11px] text-neutral-400 text-center'>
-                上次检查 {report.checkedAt}　·　只做对比，不会自动更新
+                上次检查 {report.checkedAt}　·　自动检测由 Actions 每天 02:00 执行
               </p>
             </>
           )}
