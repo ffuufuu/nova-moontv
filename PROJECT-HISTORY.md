@@ -174,6 +174,7 @@ v2 的做法：
 **换打法**：服务器 `git archive HEAD` → 本地 `/tmp/build` → `pnpm install`（57s）→ `npx tsc --noEmit`，一眼看到真实错误——`Favorite` 缺 `is_invalid`（`d1.db.ts` / `postgres.db.ts` 各两处）。补上后再本地 `next build` 全量验证通过。提交 `3e723b5` → 构建 **#81 成功（8m18s）** → 镜像 `010c335167b1` → `compose up -d --force-recreate` 上线。
 
 **验收**（登录态）：`/` 200、`/admin` 200、`/api/tvbox/config` 200（`enabled:true`、订阅地址带 token）、`/api/favorites` 200、`/api/playrecords` 200、`/api/search?q=三体` 200、`/api/detail?source=iqiyizyapi.com&id=87003` 200 且有集数、`/play` 200。
+**v1.6.1 顺手修掉的面板 UI 坑**（用户拿手机截图指出「整屏全占了」）：面板用的是 `fixed inset-0 + max-w-lg + max-h-[88vh]` 的居中 modal，但手机 CSS 宽度 424px < `max-w-lg`(512px) → 实际满宽，`88vh` → 近整屏；更致命的是 `z-[100]` 低于站点顶栏/底栏的层级，面板顶部标题被「Nova 影库」导航条压住、底部压着底部 tab。改成：层级 `z-[200]`、手机端 `items-end` 底部抽屉 + `rounded-t-2xl` + `max-h-[80vh]` + 抓手条 + `env(safe-area-inset-bottom)`，桌面仍是居中卡片（`sm:` 断点恢复）。顺带把「可安全摘/需手工/建议别动」改成「可机器合/需人工/跳过」，「该版增量」也从「高危/可摘」改成「可机器合/需人工」。
 版本面板数据也修了：`ourVersion` 由宿主 `check.py` 读 `src/lib/version.ts`（原报告是旧值 1.5.1，重跑即 1.6.0）；同时把 `sync/upstream-state.json` restamp 到 `a726372 / v227.1.0`，并把 `check.py` 的基线优先级改成 **state.json 优先**（原来会被 `/opt/upstream-check/base*.txt` 强覆盖，导致合完还显示「未同步」）。
 
 ---
@@ -190,6 +191,7 @@ v2 的做法：
 | v1.5.0 | 2026-11-22 | `625c178` | #77（11m37s） | 图片代理本地磁盘缓存（30 天 / 800MB LRU）+ 系统瘦身（废镜像、fwupd/multipathd、apt 内存上限） |
 | v1.5.1 | 2026-11-22 | `3439376` | #78（11m59s） | 播放页指定源详情失败时自动切源 + 错误页显示真实原因 |
 | v1.6.0 | 2026-11-22 | `3e723b5` | #81（8m18s） | 吸收上游 v227.1.0 的 20 个自动增量（收藏失效检测 / 番剧数据 / 工具库重构 / TVBox 订阅相关）+ 同步工具 v2 |
+| v1.6.1 | 2026-11-22 | `aa5eef5` | #82（9m29s） | 版本面板从整屏 modal 改成底部抽屉（手机上不再盖满全屏、不再压住站点顶栏）+ 面板统计口径改文件级 |
 
 ---
 
