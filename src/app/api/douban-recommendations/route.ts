@@ -6,6 +6,9 @@ import { fetchDoubanWithVerification } from '@/lib/douban-anti-crawler';
 
 export const runtime = 'nodejs';
 
+// 最近一次成功结果：豆瓣偶发超时时直接复用，避免首页空白
+let lastGoodRecommendations: any[] | null = null;
+
 interface DoubanRecommendation {
   doubanId: string;
   title: string;
@@ -113,6 +116,10 @@ export async function GET(request: NextRequest) {
 
     console.log('处理后的推荐数:', processedRecommendations.length);
 
+    if (processedRecommendations.length > 0) {
+      lastGoodRecommendations = processedRecommendations;
+    }
+
     return NextResponse.json(
       {
         recommendations: processedRecommendations,
@@ -125,9 +132,16 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error('Douban recommendations fetch error:', error);
+    // 兜底：返回最近一次成功结果；没有则返回空数组，前端显示占位而不是报错
+    if (lastGoodRecommendations && lastGoodRecommendations.length > 0) {
+      return NextResponse.json(
+        { recommendations: lastGoodRecommendations },
+        { headers: { 'Cache-Control': 'public, max-age=300' } }
+      );
+    }
     return NextResponse.json(
-      { error: 'Failed to parse douban recommendations' },
-      { status: 500 }
+      { recommendations: [] },
+      { headers: { 'Cache-Control': 'public, max-age=60' } }
     );
   }
 }

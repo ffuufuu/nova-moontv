@@ -14,8 +14,18 @@ import {
   normalizeScriptSources,
 } from '@/lib/source-script';
 import { yellowWords } from '@/lib/yellow';
+import {
+  isSourceCoolingDown,
+  recordSourceFailure,
+  recordSourceSuccess,
+} from '@/lib/source-health';
 
 export const runtime = 'nodejs';
+
+// 同关键词结果缓存：5 分钟 / 最多 50 条（键含用户名与查询模式，避免串权限）
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const SEARCH_CACHE_MAX = 50;
+const searchResultCache = new Map<string, { at: number; payload: { results: any[] } }>();
 
 export async function GET(request: NextRequest) {
   const authInfo = getAuthInfoFromCookie(request);
@@ -43,10 +53,20 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const cacheKey = `${authInfo.username}|${specialOnly ? 1 : 0}|${privateOnly ? 1 : 0}|${query.trim().toLowerCase()}`;
+  const cachedEntry = searchResultCache.get(cacheKey);
+  if (cachedEntry && Date.now() - cachedEntry.at < SEARCH_CACHE_TTL_MS) {
+    return NextResponse.json(cachedEntry.payload, {
+      headers: { 'Cache-Control': 'private, max-age=60' },
+    });
+  }
+
   const config = await getConfig();
   const apiSites = privateOnly
     ? []
     : await getAvailableApiSites(authInfo.username, specialOnly);
+  // 连续失败进入冷却的源，本次搜索直接跳过（降权，不写配置）
+  const activeSites = apiSites.filter((site) => !isSourceCoolingDown(site.key));
   const [hasOpenListPermission, hasEmbyPermission] = await Promise.all([
     hasFeaturePermission(authInfo.username, 'private_library'),
     hasFeaturePermission(authInfo.username, 'emby'),
@@ -186,11 +206,20 @@ export async function GET(request: NextRequest) {
     : Promise.resolve([]);
 
   // 添加超时控制和错误处理，避免慢接口拖累整体响应
-  const searchPromises = apiSites.map((site) =>
+  const searchPromises = activeSites.map((site) =>
     Promise.race([
-      searchFromApi(site, query),
+      (async () => {
+        try {
+          const siteResults = await searchFromApi(site, query);
+          recordSourceSuccess(site.key);
+          return siteResults;
+        } catch (siteError) {
+          recordSourceFailure(site.key);
+          throw siteError;
+        }
+      })(),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`${site.name} timeout`)), 20000)
+        setTimeout(() => reject(new Error(`${site.name} timeout`)), 8000)
       ),
     ]).catch((err) => {
       console.warn(`搜索失败 ${site.name}:`, err.message);
@@ -287,6 +316,19 @@ export async function GET(request: NextRequest) {
       const weightB = b.weight ?? 0;
       return weightB - weightA;
     });
+
+    // 写入 5 分钟结果缓存（LRU，最多 50 条）
+    if (flattenedResults.length > 0) {
+      searchResultCache.set(cacheKey, {
+        at: Date.now(),
+        payload: { results: flattenedResults },
+      });
+      while (searchResultCache.size > SEARCH_CACHE_MAX) {
+        const oldestKey = searchResultCache.keys().next().value;
+        if (oldestKey === undefined) break;
+        searchResultCache.delete(oldestKey);
+      }
+    }
 
     const cacheTime = 60; // 60 秒短缓存：删源/改源后最多 1 分钟生效
 

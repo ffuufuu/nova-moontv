@@ -5,6 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getAvailableApiSites, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
+import {
+  isSourceCoolingDown,
+  recordSourceFailure,
+  recordSourceSuccess,
+} from '@/lib/source-health';
 import { hasFeaturePermission } from '@/lib/permissions';
 import { yellowWords } from '@/lib/yellow';
 import { getProxyToken } from '@/lib/emby-token';
@@ -60,7 +65,9 @@ export async function GET(request: NextRequest) {
   });
 
   // 按权重降序排序 apiSites
-  const sortedApiSites = [...apiSites].sort((a, b) => {
+  const sortedApiSites = [...apiSites]
+    .filter((site) => !isSourceCoolingDown(site.key))
+    .sort((a, b) => {
     const weightA = weightMap.get(a.key) ?? 0;
     const weightB = weightMap.get(b.key) ?? 0;
     return weightB - weightA;
@@ -370,9 +377,18 @@ export async function GET(request: NextRequest) {
         try {
           // 添加超时控制
           const searchPromise = Promise.race([
-            searchFromApi(site, query),
+            (async () => {
+              try {
+                const siteResults = await searchFromApi(site, query);
+                recordSourceSuccess(site.key);
+                return siteResults;
+              } catch (siteError) {
+                recordSourceFailure(site.key);
+                throw siteError;
+              }
+            })(),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error(`${site.name} timeout`)), 20000)
+              setTimeout(() => reject(new Error(`${site.name} timeout`)), 8000)
             ),
           ]);
 

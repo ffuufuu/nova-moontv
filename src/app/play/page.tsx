@@ -2038,6 +2038,8 @@ function PlayPageClient() {
   // Xiaoya链接刷新相关状态
   const [isRefreshingUrl, setIsRefreshingUrl] = useState(false); // 是否正在刷新链接
   const retryCountRef = useRef(0); // 重试计数
+  const hlsFailCountRef = useRef(0); // 本次播放会话内的致命错误计数
+  const autoSwitchedRef = useRef(false); // 本次播放是否已自动换过源
   const lastRefreshTimeRef = useRef(0); // 上次刷新时间
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null); // 14分钟定时器
   const currentXiaoyaUrlRef = useRef<string>(''); // 当前xiaoya原始URL（用于刷新）
@@ -2343,6 +2345,10 @@ function PlayPageClient() {
 
   // 换源相关状态
   const [availableSources, setAvailableSources] = useState<SearchResult[]>([]);
+  const availableSourcesRef = useRef<SearchResult[]>([]);
+  useEffect(() => {
+    availableSourcesRef.current = availableSources;
+  }, [availableSources]);
   const [sourceSearchLoading, setSourceSearchLoading] = useState(false);
   const [sourceSearchError, setSourceSearchError] = useState<string | null>(
     null
@@ -7728,13 +7734,13 @@ function PlayPageClient() {
                 switch (strategy) {
                   case 'low':
                     return {
-                      maxBufferLength: 15,
-                      backBufferLength: 15,
+                      maxBufferLength: 30,
+                      backBufferLength: 20,
                       maxBufferSize: 30 * 1000 * 1000, // ~30MB
                     };
                   case 'medium':
                     return {
-                      maxBufferLength: 30,
+                      maxBufferLength: 45,
                       backBufferLength: 30,
                       maxBufferSize: 60 * 1000 * 1000, // ~60MB
                     };
@@ -7771,6 +7777,9 @@ function PlayPageClient() {
                 loaderClass = Hls.DefaultConfig.loader;
               }
 
+              hlsFailCountRef.current = 0;
+              autoSwitchedRef.current = false;
+
               const hls = new Hls({
                 debug: false, // 关闭日志
                 enableWorker: true, // WebWorker 解码，降低主线程压力
@@ -7782,6 +7791,12 @@ function PlayPageClient() {
                 maxBufferLength: bufferConfig.maxBufferLength, // 前向缓冲长度
                 backBufferLength: bufferConfig.backBufferLength, // 已播放内容保留长度
                 maxBufferSize: bufferConfig.maxBufferSize, // 最大缓冲大小
+
+                /* 分片/清单超时放宽：跨境源慢时不至于频繁超时重试 */
+                manifestLoadingTimeOut: 20000,
+                manifestLoadingMaxRetry: 2,
+                fragLoadingTimeOut: 35000,
+                fragLoadingMaxRetry: 3,
 
                 /* 自定义loader */
                 loader: loaderClass as any,
@@ -7865,6 +7880,27 @@ function PlayPageClient() {
               hls.on(Hls.Events.ERROR, function (event: any, data: any) {
                 console.error('HLS Error:', event, data);
                 if (data.fatal) {
+                  hlsFailCountRef.current += 1;
+                  if (hlsFailCountRef.current >= 2 && !autoSwitchedRef.current) {
+                    const nextSource = (availableSourcesRef.current || []).find(
+                      (item) => item.source !== currentSourceRef.current
+                    );
+                    if (nextSource) {
+                      autoSwitchedRef.current = true;
+                      console.log('[HLS] 连续失败，自动切换源:', nextSource.source, nextSource.id);
+                      try {
+                        hls.destroy();
+                      } catch (destroyError) {
+                        console.warn('[HLS] destroy failed:', destroyError);
+                      }
+                      void handleSourceChange(
+                        nextSource.source as string,
+                        String(nextSource.id),
+                        (nextSource.title || '') as string
+                      );
+                      return;
+                    }
+                  }
                   switch (data.type) {
                     case Hls.ErrorTypes.NETWORK_ERROR:
                       // 检查是否是 manifest 加载错误（通常是 403/404/CORS 错误）

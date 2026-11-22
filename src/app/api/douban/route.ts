@@ -100,7 +100,7 @@ function handleTop250(pageStart: number) {
 
   // 直接使用 fetch 获取 HTML 页面
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
 
   const fetchOptions = {
     signal: controller.signal,

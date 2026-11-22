@@ -126,7 +126,7 @@ async function fetchWithTimeout(
   proxyUrl: string
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4秒超时（失败走缓存兜底）
 
   // 检查是否使用代理
   const finalUrl =
