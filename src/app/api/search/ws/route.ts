@@ -6,10 +6,12 @@ import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getAvailableApiSites, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
 import {
+  getSourcePriority,
   isSourceCoolingDown,
   recordSourceFailure,
   recordSourceSuccess,
 } from '@/lib/source-health';
+import { getCachedSearch, makeSearchCacheKey, setCachedSearch } from '@/lib/search-result-cache';
 import { hasFeaturePermission } from '@/lib/permissions';
 import { yellowWords } from '@/lib/yellow';
 import { getProxyToken } from '@/lib/emby-token';
@@ -45,6 +47,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const cacheKey = makeSearchCacheKey(authInfo.username, specialOnly, privateOnly, query);
+
   const config = await getConfig();
   const apiSites = privateOnly
     ? []
@@ -64,14 +68,14 @@ export async function GET(request: NextRequest) {
     weightMap.set(source.key, source.weight ?? 0);
   });
 
-  // 按权重降序排序 apiSites
+  // 排序 apiSites：权重为主，健康度与实测耗时作为加分，提前把快源排到前面
   const sortedApiSites = [...apiSites]
     .filter((site) => !isSourceCoolingDown(site.key))
     .sort((a, b) => {
-    const weightA = weightMap.get(a.key) ?? 0;
-    const weightB = weightMap.get(b.key) ?? 0;
-    return weightB - weightA;
-  });
+      const pa = getSourcePriority(a.key, weightMap.get(a.key) ?? 0);
+      const pb = getSourcePriority(b.key, weightMap.get(b.key) ?? 0);
+      return pb - pa;
+    });
 
   // 检查是否配置了 OpenList
   const hasOpenList = !!(
@@ -117,6 +121,29 @@ export async function GET(request: NextRequest) {
       };
 
       // 获取 Emby 源数量
+      // 命中共享缓存：一次性输出全部结果，秒出
+      const cached = getCachedSearch(cacheKey);
+      if (cached && cached.results.length > 0) {
+        const cachedPayloads = [
+          { type: 'start', query, totalSources: 1, timestamp: Date.now() },
+          { type: 'source_result', source: 'cache', sourceName: '缓存', results: cached.results, timestamp: Date.now() },
+          { type: 'complete', totalResults: cached.results.length, completedSources: 1, timestamp: Date.now() },
+        ];
+        for (const item of cachedPayloads) {
+          if (!safeEnqueue(encoder.encode(`data: ${JSON.stringify(item)}\n\n`))) {
+            streamClosed = true;
+            return;
+          }
+        }
+        streamClosed = true;
+        try {
+          controller.close();
+        } catch (error) {
+          console.warn('Failed to close controller (cache):', error);
+        }
+        return;
+      }
+
       let embySourcesCount = 0;
       if (hasEmby) {
         try {
@@ -148,6 +175,9 @@ export async function GET(request: NextRequest) {
 
       const maybeComplete = () => {
         if (completedSources !== totalSourceCount || streamClosed) return;
+        if (allResults.length > 0) {
+          setCachedSearch(cacheKey, { results: allResults });
+        }
         const completeEvent = `data: ${JSON.stringify({
           type: 'complete',
           totalResults: allResults.length,
@@ -330,7 +360,7 @@ export async function GET(request: NextRequest) {
             }
           })(),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('OpenList timeout')), 20000)
+            setTimeout(() => reject(new Error('OpenList timeout')), 10000)
           ),
         ])
           .then((openlistResults: any) => {
@@ -378,9 +408,10 @@ export async function GET(request: NextRequest) {
           // 添加超时控制
           const searchPromise = Promise.race([
             (async () => {
+              const searchStartedAt = Date.now();
               try {
                 const siteResults = await searchFromApi(site, query);
-                recordSourceSuccess(site.key);
+                recordSourceSuccess(site.key, Date.now() - searchStartedAt);
                 return siteResults;
               } catch (siteError) {
                 recordSourceFailure(site.key);
@@ -488,7 +519,7 @@ export async function GET(request: NextRequest) {
               payload: {},
             }),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error(`${script.name} timeout`)), 20000)
+              setTimeout(() => reject(new Error(`${script.name} timeout`)), 6000)
             ),
           ]);
 
@@ -506,7 +537,7 @@ export async function GET(request: NextRequest) {
                   },
                 }),
                 new Promise((_, reject) =>
-                  setTimeout(() => reject(new Error(`${script.name}/${source.name} timeout`)), 20000)
+                  setTimeout(() => reject(new Error(`${script.name}/${source.name} timeout`)), 6000)
                 ),
               ]);
 

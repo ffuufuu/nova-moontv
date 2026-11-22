@@ -19,13 +19,11 @@ import {
   recordSourceFailure,
   recordSourceSuccess,
 } from '@/lib/source-health';
+import { getCachedSearch, makeSearchCacheKey, setCachedSearch } from '@/lib/search-result-cache';
 
 export const runtime = 'nodejs';
 
-// 同关键词结果缓存：5 分钟 / 最多 50 条（键含用户名与查询模式，避免串权限）
-const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
-const SEARCH_CACHE_MAX = 50;
-const searchResultCache = new Map<string, { at: number; payload: { results: any[] } }>();
+// 同关键词结果缓存：与流式搜索共用 @/lib/search-cache（5 分钟 / 50 条）
 
 export async function GET(request: NextRequest) {
   const authInfo = getAuthInfoFromCookie(request);
@@ -53,10 +51,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const cacheKey = `${authInfo.username}|${specialOnly ? 1 : 0}|${privateOnly ? 1 : 0}|${query.trim().toLowerCase()}`;
-  const cachedEntry = searchResultCache.get(cacheKey);
-  if (cachedEntry && Date.now() - cachedEntry.at < SEARCH_CACHE_TTL_MS) {
-    return NextResponse.json(cachedEntry.payload, {
+  const cacheKey = makeSearchCacheKey(authInfo.username, specialOnly, privateOnly, query);
+  const cachedPayload = getCachedSearch(cacheKey);
+  if (cachedPayload) {
+    return NextResponse.json(cachedPayload, {
       headers: { 'Cache-Control': 'private, max-age=60' },
     });
   }
@@ -139,7 +137,7 @@ export async function GET(request: NextRequest) {
         }
       })(),
       new Promise<any[]>((_, reject) =>
-        setTimeout(() => reject(new Error(`${embyConfig.name} timeout`)), 20000)
+        setTimeout(() => reject(new Error(`${embyConfig.name} timeout`)), 10000)
       ),
     ]).catch((error) => {
       console.error(`[Search] 搜索 ${embyConfig.name} 超时:`, error);
@@ -197,7 +195,7 @@ export async function GET(request: NextRequest) {
           }
         })(),
         new Promise<any[]>((_, reject) =>
-          setTimeout(() => reject(new Error('OpenList timeout')), 20000)
+          setTimeout(() => reject(new Error('OpenList timeout')), 10000)
         ),
       ]).catch((error) => {
         console.error('[Search] 搜索 OpenList 超时:', error);
@@ -268,7 +266,7 @@ export async function GET(request: NextRequest) {
         }
       })(),
       new Promise<any[]>((_, reject) =>
-        setTimeout(() => reject(new Error(`${script.name} timeout`)), 20000)
+        setTimeout(() => reject(new Error(`${script.name} timeout`)), 6000)
       ),
     ]).catch((error) => {
       console.error(`[Search] 搜索脚本 ${script.name} 超时:`, error);
@@ -317,17 +315,9 @@ export async function GET(request: NextRequest) {
       return weightB - weightA;
     });
 
-    // 写入 5 分钟结果缓存（LRU，最多 50 条）
+    // 写入共享 5 分钟结果缓存，与流式搜索耽合
     if (flattenedResults.length > 0) {
-      searchResultCache.set(cacheKey, {
-        at: Date.now(),
-        payload: { results: flattenedResults },
-      });
-      while (searchResultCache.size > SEARCH_CACHE_MAX) {
-        const oldestKey = searchResultCache.keys().next().value;
-        if (oldestKey === undefined) break;
-        searchResultCache.delete(oldestKey);
-      }
+      setCachedSearch(cacheKey, { results: flattenedResults });
     }
 
     const cacheTime = 60; // 60 秒短缓存：删源/改源后最多 1 分钟生效

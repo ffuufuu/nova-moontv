@@ -10,6 +10,8 @@ type HealthRecord = {
   lastFailAt: number;
   lastOkAt: number;
   cooldownUntil: number;
+  avgMs: number;
+  samples: number;
 };
 
 const healthMap = new Map<string, HealthRecord>();
@@ -22,17 +24,28 @@ function getRecord(key: string): HealthRecord {
     lastFailAt: 0,
     lastOkAt: 0,
     cooldownUntil: 0,
+    avgMs: 0,
+    samples: 0,
   };
   healthMap.set(key, fresh);
   return fresh;
 }
 
-export function recordSourceSuccess(key: string, now: number = Date.now()): void {
+export function recordSourceSuccess(
+  key: string,
+  elapsedMs?: number,
+  now: number = Date.now()
+): void {
   if (!key) return;
   const rec = getRecord(key);
   rec.fails = 0;
   rec.lastOkAt = now;
   rec.cooldownUntil = 0;
+  // 记录响应耗时（指数滑动平均），用于首屏优先排序
+  if (typeof elapsedMs === 'number' && elapsedMs >= 0 && elapsedMs < 30000) {
+    rec.samples += 1;
+    rec.avgMs = rec.samples === 1 ? elapsedMs : rec.avgMs * 0.7 + elapsedMs * 0.3;
+  }
 }
 
 export function recordSourceFailure(key: string, now: number = Date.now()): void {
@@ -81,6 +94,19 @@ export function getSourceHealthSnapshot(): Array<{
     });
   });
   return list.sort((a, b) => b.fails - a.fails);
+}
+
+/**
+ * 源排序优先级：管理端权重为主序，再叠加健康度与实测耗时。
+ * 分值越大越先搜索 —— 让首屏结果尽量来自“最近又快又没挂”的源。
+ */
+export function getSourcePriority(key: string, weight: number = 0): number {
+  const rec = healthMap.get(key);
+  const base = (Number.isFinite(weight) ? weight : 0) * 1000;
+  if (!rec) return base + 55;
+  const healthBonus = rec.fails === 0 ? 55 : Math.max(0, 55 - rec.fails * 18);
+  const latencyBonus = rec.samples > 0 ? Math.max(0, 40 - Math.min(40, rec.avgMs / 25)) : 20;
+  return base + healthBonus + latencyBonus;
 }
 
 export function resetSourceHealth(key?: string): void {
