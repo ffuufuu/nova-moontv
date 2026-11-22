@@ -486,6 +486,11 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // 本轮搜索结束（API 源路径）：写入共享缓存
+        if (completedSources === totalSourceCount && allResults.length > 0) {
+          setCachedSearch(cacheKey, { results: allResults });
+        }
+
         // 检查是否所有源都已完成
         if (completedSources === totalSourceCount) {
           if (!streamClosed) {
