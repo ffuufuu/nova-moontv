@@ -171,12 +171,12 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
   const version = report?.ourVersion || CURRENT_VERSION;
 
   const overlay = (
-    <div className='fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-6'>
+    <div className='fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-6'>
       <div
         className='absolute inset-0 bg-black/60 backdrop-blur-sm'
         onClick={onClose}
       />
-      <div className='relative w-full sm:max-w-lg max-h-[80vh] sm:max-h-[86vh] flex flex-col rounded-t-2xl sm:rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]'>
+      <div className='relative w-full sm:max-w-lg max-h-[62vh] sm:max-h-[86vh] flex flex-col rounded-t-2xl sm:rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]'>
         {/* 抽屉抓手（仅手机） */}
         <div className='sm:hidden pt-2 pb-1 flex justify-center flex-shrink-0'>
           <span className='h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700' />
@@ -201,7 +201,7 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
         </div>
 
         {/* 内容 */}
-        <div className='flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-4'>
+        <div className='flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 py-3 space-y-3'>
           {loading && !report && (
             <div className='flex items-center justify-center py-10 text-sm text-neutral-500'>
               <RefreshCw className='w-4 h-4 mr-2 animate-spin' />
@@ -331,9 +331,6 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
                       冲突 issue
                     </a>
                   </div>
-                  <p className='text-[11px] text-neutral-400 leading-relaxed'>
-                    流程：检测上游 → 只摘后端/接口增量 → 干净合并开 PR，冲突开 issue；合并后按规则升版本号才算新版本。
-                  </p>
                 </div>
               )}
 
@@ -415,7 +412,7 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
         </div>
 
         {/* 底部按钮 */}
-        <div className='px-4 sm:px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 flex-shrink-0'>
+        <div className='px-4 sm:px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-neutral-200 dark:border-neutral-800 flex-shrink-0'>
           <button
             onClick={handleCheck}
             disabled={checking}
