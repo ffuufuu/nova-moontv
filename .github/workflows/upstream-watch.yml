@@ -41,11 +41,11 @@ jobs:
           OLD=$(python3 -c "import json;print(json.load(open('sync/upstream-state.json'))['sha'])")
           echo "old=$OLD"
           echo "new=$NEW"
+          echo "old=$OLD" >> "$GITHUB_OUTPUT"
           if [ "$OLD" = "$NEW" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "old=$OLD" >> "$GITHUB_OUTPUT"
             echo "new=$NEW" >> "$GITHUB_OUTPUT"
           fi
 
