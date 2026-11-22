@@ -5586,6 +5586,8 @@ function PlayPageClient() {
       // 如果已经有了source和id，优先通过单个详情接口快速获取
       let detailData: SearchResult | null = null;
       let sourcesInfo: SearchResult[] = [];
+      // v1.5.1：记录指定源取详情失败的原因，用于提示与兜底
+      let detailFailReason = '';
 
       if (currentSource && currentId) {
         const cachedSources = getCachedSourcesData(searchTitle || videoTitle);
@@ -5612,9 +5614,13 @@ function PlayPageClient() {
             if (currentSourceDetail.length > 0) {
               detailData = currentSourceDetail[0];
               sourcesInfo = currentSourceDetail;
+            } else {
+              detailFailReason = '该源详情接口无返回（多为源已下线或接口改版）';
             }
           } catch (err) {
             console.error('获取当前源详情失败:', err);
+            detailFailReason =
+              err instanceof Error ? err.message : '详情接口请求失败';
           }
         }
 
@@ -5644,8 +5650,72 @@ function PlayPageClient() {
         sourcesInfo = await fetchSourcesData(searchTitle || videoTitle);
       }
 
+      // v1.5.1 兜底：指定源取详情失败（源被删 / 改名 / 接口 404）时，
+      // 不直接甩「未找到匹配结果」，而是用片名在当前可用源里重新找同一部片并自动切源。
+      if (!detailData && sourcesInfo.length === 0 && currentSource && currentId) {
+        try {
+          const retrySources = await fetchSourcesData(searchTitle || videoTitle);
+          const queryTitle = (searchTitle || videoTitle || '').trim();
+          const candidates = retrySources
+            .filter((item) => item.episodes && item.episodes.length > 0)
+            .slice(0, 12);
+          const remembered = readSourceMemory()[searchTitle || videoTitle];
+
+          // 优先顺序：记住的源 → 同名的别的源 → 其余源
+          const ordered = [
+            ...candidates.filter((c) => c.source === remembered),
+            ...candidates.filter(
+              (c) => c.source !== currentSource && (c.title || '').trim() === queryTitle
+            ),
+            ...candidates.filter((c) => c.source !== currentSource),
+          ];
+          const seen = new Set<string>();
+          for (const candidate of ordered) {
+            const key = `${candidate.source}-${candidate.id}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            // 最多尝试 3 个候选，避免拖慢首屏
+            if (seen.size > 3) break;
+
+            const verified = await fetchSourceDetail(
+              candidate.source,
+              candidate.id,
+              candidate.title || queryTitle
+            );
+            if (verified.length > 0 && verified[0].episodes?.length) {
+              const picked = verified[0];
+              const mergedMap = new Map<string, SearchResult>();
+              [...verified, ...retrySources].forEach((item) => {
+                const mergedKey = `${item.source}-${item.id}`;
+                if (!mergedMap.has(mergedKey)) mergedMap.set(mergedKey, item);
+              });
+              detailData = picked;
+              sourcesInfo = applyCorrectionsToSources(
+                Array.from(mergedMap.values())
+              );
+              setAvailableSources(sourcesInfo);
+              console.log('[Play] 原源详情失败，已自动切源:', picked.source);
+              setToast({
+                message: `原源不可用，已自动切换到「${
+                  picked.source_name || picked.source
+                }」`,
+                type: 'info',
+                onClose: () => setToast(null),
+              });
+              break;
+            }
+          }
+        } catch (err) {
+          console.error('[Play] 自动切源失败:', err);
+        }
+      }
+
       if (!detailData && sourcesInfo.length === 0) {
-        setError('未找到匹配结果');
+        setError(
+          detailFailReason
+            ? `未找到匹配结果：${detailFailReason}`
+            : '未找到匹配结果'
+        );
         setLoading(false);
         return;
       }
@@ -5681,8 +5751,13 @@ function PlayPageClient() {
               detailData = detailSources[0];
             }
           }
-        } else {
-          setError('未找到匹配结果');
+        } else if (!detailData) {
+          // 原源已不在可用列表：自动切源段已尝试过，仍失败才报错
+          setError(
+            detailFailReason
+              ? `未找到匹配结果：${detailFailReason}`
+              : '未找到匹配结果'
+          );
           setLoading(false);
           return;
         }
