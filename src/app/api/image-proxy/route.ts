@@ -58,9 +58,12 @@ function isBangumiImageUrl(url: string): boolean {
       hostname === 'lain.bgm.tv' ||
       hostname === 'r.bgm.tv' ||
       hostname === 'bangumi.lol' ||
+      hostname === 'bgm.lat' ||
+      hostname === 'api.bgm.lat' ||
       hostname.endsWith('.bgm.tv') ||
       hostname.endsWith('.bangumi.tv') ||
-      hostname.endsWith('.bangumi.lol')
+      hostname.endsWith('.bangumi.lol') ||
+      hostname.endsWith('.bgm.lat')
     );
   } catch {
     return false;
