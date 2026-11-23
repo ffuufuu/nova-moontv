@@ -180,6 +180,17 @@ v2 的做法：
 
 ---
 
+### 2026-11-23 · 把这次实战的经验落成工具（不碰业务代码）
+
+上游 v227.1.0 那一轮暴露的问题（CI 不可观测、manual 反复判断、浮层被压、版本三处不同步）都固化成了文件：
+
+- `sync/verify.sh`：合并闸门。`bash sync/verify.sh` 跑 `tsc --noEmit`；`--build` 加完整 `next build`；`--smoke` 用 `BASE_URL + SMOKE_USER/SMOKE_PASS` 登录后验 `/`、`/admin`、`/api/upstream/report`、`/api/tvbox/config`、`/api/favorites`、`/api/playrecords`、`/api/search` 七个点。红就别推。
+- `sync/manual-backlog.md`：上游「必须人工」清单台账，每条标 `永久人工 / 待做 / 不做`，每版只追加。本次 20 条已入库，其中 `待做` 只有 3 个：`tvbox/subscribe`、`search/route`（抠 tvbox 接入）、`image-proxy`（2 行）。
+- `docs/ui-rules.md`：浮层层级钉死（顶栏 999 / 底栏 600 / 自建模态 1000+）+ 移动端抽屉写法（62vh、安全区、`overscroll-contain`）+ 375/390/430 三档验收清单。
+- `sync/restamp.sh` 重写：版本真值只认 `src/lib/version.ts`，`VERSION.txt` 与 `package.json` 由它派生（`--check` 会报不一致）。已用它把 1.6.3 的三处一次对齐。
+
+实测：`verify.sh --smoke` 在服务器上跑通（登录 200 + 七个接口全 200）。
+
 ## 三、版本记录
 
 | 版本 | 日期 | 提交 | 构建 | 内容 |
@@ -194,6 +205,7 @@ v2 的做法：
 | v1.6.0 | 2026-11-22 | `3e723b5` | #81（8m18s） | 吸收上游 v227.1.0 的 20 个自动增量（收藏失效检测 / 番剧数据 / 工具库重构 / TVBox 订阅相关）+ 同步工具 v2 |
 | v1.6.1 | 2026-11-22 | `aa5eef5` | #82（9m29s） | 版本面板从整屏 modal 改成底部抽屉（手机上不再盖满全屏、不再压住站点顶栏）+ 面板统计口径改文件级 |
 | v1.6.2 | 2026-11-23 | `7a1f19a` | #83（8m21s） | 面板层级提到 `z-[1000]`（压过顶栏 999 / 底栏 600）、高度收到 62vh、底栏按钮不再被 nav 遮住 |
+| v1.6.3 | 2026-11-23 | `c6e9849` | #84（11m7s） | 登录页版本号跳自己仓库、电视端文案去上游品牌；版本号改为 `version.ts` 单一真值派生 |
 
 ---
 
