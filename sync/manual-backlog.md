@@ -22,9 +22,9 @@
 | `src/lib/tv-search.ts` | +107 | 依赖 `tvbox-bridge.shared` | 不做 |
 | `src/lib/admin-video-sources.ts` | +75 | 依赖 `tvbox-bridge.shared` | 不做 |
 | `src/lib/types.ts`（tvbox 线路字段） | +23 | 依赖 `tvbox-bridge.shared` | 不做（只补了收藏/播放记录字段） |
-| `src/app/api/search/route.ts` | +37 −3 | 我们改过（流式共享缓存） | **待做**：抠 tvbox 搜索接入那几行 |
+| `src/app/api/search/route.ts` | +37 −3 | 我们改过（流式共享缓存） | **不做（阻塞）**：+37 行全部依赖 `tvbox-bridge.server` 的 `resolveTVBoxBridgeSites` / `runTVBoxBridgeSearch`，不引 bridge 就没法单独摘 |
 | `src/app/api/search/ws/route.ts` | +100 −2 | 我们改过（v1.2 流式） | **待做**：只挑断线重连相关 |
-| `src/app/api/image-proxy/route.ts` | +2 −2 | 我们改过（v1.5.0 磁盘缓存） | **待做**：2 行，看清楚手动套 |
+| `src/app/api/image-proxy/route.ts` | +2 −2 | 我们改过（v1.5.0 磁盘缓存） | **已做（v1.6.4）**：番剧镜像域名 `bangumi.lol` → `bgm.lat`，新域名一并认 |
 | `src/lib/admin.types.ts` | +34 −2 | 我们改过 | 不做（跟着 admin 一起） |
 | `src/lib/config.ts` | +21 −14 | 我们改过（默认值） | 不做（上游默认值跟我们冲突） |
 | `src/lib/version.ts` | +1 −1 | 我们改过 | 不做（restamp 自动维护） |
