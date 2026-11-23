@@ -12,6 +12,7 @@ import {
   recordSourceSuccess,
 } from '@/lib/source-health';
 import { getCachedSearch, makeSearchCacheKey, setCachedSearch } from '@/lib/search-result-cache';
+import { capSearchResults } from '@/lib/search-cap';
 import { hasFeaturePermission } from '@/lib/permissions';
 import { yellowWords } from '@/lib/yellow';
 import { getProxyToken } from '@/lib/emby-token';
@@ -441,6 +442,9 @@ export async function GET(request: NextRequest) {
             ...result,
             weight: result.weight ?? (weightMap.get(result.source) ?? 0),
           }));
+
+          // 单源截断：控制流式推送体积（有的源一次就回 100 条）
+          filteredResults = capSearchResults(filteredResults);
 
           // 发送该源的搜索结果
           completedSources++;

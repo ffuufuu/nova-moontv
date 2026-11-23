@@ -20,6 +20,7 @@ import {
   recordSourceSuccess,
 } from '@/lib/source-health';
 import { getCachedSearch, makeSearchCacheKey, setCachedSearch } from '@/lib/search-result-cache';
+import { capSearchResults } from '@/lib/search-cap';
 
 export const runtime = 'nodejs';
 
@@ -314,6 +315,9 @@ export async function GET(request: NextRequest) {
       const weightB = b.weight ?? 0;
       return weightB - weightA;
     });
+
+    // 按源截断：控制响应体积（51 源聚合时原本可达 500+ 条 / 1MB+）
+    flattenedResults = capSearchResults(flattenedResults);
 
     // 写入共享 5 分钟结果缓存，与流式搜索耽合
     if (flattenedResults.length > 0) {

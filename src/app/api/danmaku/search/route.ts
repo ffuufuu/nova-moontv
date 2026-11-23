@@ -6,6 +6,10 @@ import { getDanmakuApiBaseUrl } from '@/lib/danmaku/config';
 
 export const runtime = 'nodejs';
 
+// 上游弹幕服务常返 503；失败后 60 秒内直接短路，避免每次请求都白等超时
+const FAIL_CACHE_MS = 60 * 1000;
+let lastFailure: { at: number; message: string } | null = null;
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -23,6 +27,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (lastFailure && Date.now() - lastFailure.at < FAIL_CACHE_MS) {
+      return NextResponse.json(
+        {
+          errorCode: -1,
+          success: false,
+          errorMessage: lastFailure.message,
+          animes: [],
+        },
+        { status: 200 }
+      );
+    }
+
     // 从数据库读取弹幕配置
     const config = await getConfig();
     const baseUrl = getDanmakuApiBaseUrl(config.SiteConfig);
@@ -31,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // 添加超时控制
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 10秒超时
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch(apiUrl, {
@@ -50,6 +66,7 @@ export async function GET(request: NextRequest) {
       }
 
       const data = await response.json();
+      lastFailure = null;
 
       return NextResponse.json(data);
     } catch (fetchError) {
@@ -63,6 +80,8 @@ export async function GET(request: NextRequest) {
       throw fetchError;
     }
   } catch (error) {
+    const message = error instanceof Error ? error.message : '搜索失败';
+    lastFailure = { at: Date.now(), message };
     console.error('弹幕搜索代理错误:', error);
     return NextResponse.json(
       {
