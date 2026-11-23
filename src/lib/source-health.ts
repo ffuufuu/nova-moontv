@@ -106,7 +106,10 @@ export function getSourcePriority(key: string, weight: number = 0): number {
   if (!rec) return base + 55;
   const healthBonus = rec.fails === 0 ? 55 : Math.max(0, 55 - rec.fails * 18);
   const latencyBonus = rec.samples > 0 ? Math.max(0, 40 - Math.min(40, rec.avgMs / 25)) : 20;
-  return base + healthBonus + latencyBonus;
+  // 最近 6 小时内成功过的源，略微加权重（用户体感“刚用着还行”的源优先）
+  const recencyBonus =
+    rec.lastOkAt > 0 && Date.now() - rec.lastOkAt < 6 * 60 * 60 * 1000 ? 8 : 0;
+  return base + healthBonus + latencyBonus + recencyBonus;
 }
 
 export function resetSourceHealth(key?: string): void {

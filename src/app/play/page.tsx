@@ -6169,6 +6169,33 @@ function PlayPageClient() {
       const previousId = currentIdRef.current;
       let targetIndex = previousEpisodeIndex;
 
+      // 集号优先映射：不同源的分集顺序/数量可能不同，按索引硬切容易串集
+      const epNumOf = (title?: string): number | null => {
+        if (!title) return null;
+        const emby = title.match(/[Ss]\d+[Ee](\d+)/);
+        if (emby) return parseInt(emby[1], 10);
+        const zh = title.match(/^(\d+)$|第?\s*(\d+)\s*[集话話]?/);
+        return zh ? parseInt(zh[1] || zh[2], 10) : null;
+      };
+      const prevEpTitle =
+        (detail && detail.episodes_titles
+          ? detail.episodes_titles[previousEpisodeIndex]
+          : '') || '';
+      const prevEpNum = epNumOf(prevEpTitle);
+      if (
+        prevEpNum !== null &&
+        newDetail.episodes_titles &&
+        newDetail.episodes_titles.length > 0
+      ) {
+        const hits = newDetail.episodes_titles
+          .map((t, i) => (epNumOf(t) === prevEpNum ? i : -1))
+          .filter((i) => i >= 0);
+        if (hits.length === 1 && hits[0] !== targetIndex) {
+          console.log('[换源] 按集号对齐:', previousEpisodeIndex, '->', hits[0]);
+          targetIndex = hits[0];
+        }
+      }
+
       // 如果新源的集数跟旧源的集数不一致，清除当前剧集的所有弹幕缓存
       const oldEpisodeCount = detail?.episodes?.length || 0;
       const newEpisodeCount = newDetail.episodes?.length || 0;
@@ -6180,9 +6207,13 @@ function PlayPageClient() {
         });
       }
 
-      // 如果当前集数超出新源的范围，则跳转到第一集
-      if (!newDetail.episodes || targetIndex >= newDetail.episodes.length) {
+      // 集数不够时退到最后一集并提示（原来退到第 1 集，等于把进度丢了）
+      let clampedToLast = false;
+      if (!newDetail.episodes || newDetail.episodes.length === 0) {
         targetIndex = 0;
+      } else if (targetIndex >= newDetail.episodes.length) {
+        targetIndex = newDetail.episodes.length - 1;
+        clampedToLast = true;
       }
 
       const isSameEpisodeSwitch = targetIndex === previousEpisodeIndex;
@@ -6193,6 +6224,13 @@ function PlayPageClient() {
             targetIndex
           );
       resumeTimeRef.current = resumeTime;
+      if (clampedToLast) {
+        setToast({
+          message: `新源集数较少，已定位到第 ${targetIndex + 1} 集并沿用播放进度`,
+          type: 'info',
+          onClose: () => setToast(null),
+        });
+      }
 
       // 更新URL参数（不刷新页面）
       const newUrl = new URL(window.location.href);
