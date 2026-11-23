@@ -235,6 +235,8 @@ v2 的做法：
 - 发布链路：`git push main` → GitHub Actions「Build & Push Image」 → `docker pull ghcr.io/ffuufuu/nova-moontv:latest` → `cd /opt/moontvplus && docker compose up -d --force-recreate`
 - 回滚：旧镜像保留为 `ghcr.io/ffuufuu/nova-moontv:rollback-prev`，把 compose 里的 tag 改回它再 `up -d` 即可；代码侧 `git revert <commit>` 后重新构建。
 - 配置查看：`docker exec moontv-kvrocks redis-cli -p 6666 --raw GET admin:config`
+- 磁盘回收：每次发版都会留下一个 1.5G 的旧镜像（untagged）。2026-11-23 一次 `docker image prune -f` 回收 5.0G（49% → 34%）。已挂 **每周 05:00**（`0 5 * * 0 /usr/local/bin/moontv-docker-prune.sh`，只清悬空镜像 + 7 天前的 builder 缓存，日志 `/var/log/moontv-docker-prune.log`）；`/opt/disk-check.sh` 每 30 分钟检查一次水位，阈值已从 85% 降到 **75%**，越过就自动 prune 并写 `/var/log/disk-alert.log`。
+- 镜像保留策略：只留 `latest`（当前版本）+ `rollback-prev`（上一版本），回滚位每次发版自动前移。
 
 ---
 
